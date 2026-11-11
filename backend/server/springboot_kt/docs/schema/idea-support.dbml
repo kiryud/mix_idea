@@ -1,0 +1,193 @@
+Project idea_support {
+  database_type: 'MySQL'
+  Note: '아이디어 보조 앱의 현재 MySQL 스키마. 2026년 10월 27일 실제 테이블 메타데이터와 대조. 회원 데이터와 연결 비밀값은 포함하지 않음.'
+}
+
+Enum UserRole {
+  ADMIN
+  USER
+}
+
+Enum IpType {
+  ALLOW
+  DENY
+}
+
+Enum IpRange {
+  ALL
+  USER
+  ADMIN
+}
+
+Table users {
+  idx bigint [pk, not null, increment, note: '내부 회원 PK. 소유자 FK에서 사용']
+  uid varchar(255) [not null, note: 'JWT 및 API 외부 회원 식별자']
+  id varchar(255) [note: '로그인 아이디']
+  pw varchar(255) [note: '기존 HMAC 처리된 비밀번호 값. 원문 비밀번호를 넣지 않음']
+  email varchar(255)
+  name varchar(255)
+  role UserRole [not null, default: 'USER']
+  created_at timestamp
+  updated_at timestamp
+  indexes {
+    id [unique, name: 'id']
+    uid [unique, name: 'uid']
+  }
+  Note: '회원과 자체 JWT 인증. FK는 내부 PK idx를 참조하고 API는 uid를 사용한다.'
+}
+
+Table categories {
+  id varchar(36) [pk, not null]
+  name varchar(50) [not null]
+  name_key varchar(150) [not null, note: '공백과 대소문자 등 정규화한 이름. 중복 방지']
+  kind varchar(16) [not null]
+  guide_type varchar(16) [not null, default: 'general', note: 'v3: food/software/contest/general. 사용자 카테고리는 생성 시 선택']
+  created_by bigint
+  use_count bigint [not null, default: 0, note: '성공한 단어 추출 요청 횟수']
+  created_at timestamp(6) [not null]
+  indexes {
+    created_by [name: 'fk_category_user']
+    (kind, use_count, id) [name: 'ix_category_order']
+    name_key [unique, name: 'name_key']
+  }
+  Note: '기본 및 사용자 카테고리. created_by는 생성 회원이며 기본 카테고리는 null이다.'
+}
+
+Table words {
+  id varchar(36) [pk, not null]
+  text varchar(150) [not null]
+  text_key varchar(150) [not null]
+  keywords text [not null]
+  indexes {
+    text_key [unique, name: 'text_key']
+  }
+  Note: '공통 단어 풀. keywords는 연관 검색용 태그 텍스트이다.'
+}
+
+Table category_words {
+  id varchar(36) [pk, not null]
+  category_id varchar(36) [not null]
+  word_id varchar(36) [not null]
+  score double [not null, default: 1]
+  indexes {
+    word_id [name: 'fk_cw_word']
+    (category_id, word_id) [unique, name: 'uq_category_word']
+  }
+  Note: '카테고리와 단어의 다대다 연결. 같은 조합은 중복 저장하지 않는다.'
+}
+
+Table ideas {
+  id varchar(36) [pk, not null]
+  category_id varchar(36) [not null]
+  combo_key varchar(128) [not null, note: '카테고리와 단어 집합 및 방향성과 AI 버전의 캐시 키']
+  direction varchar(200) [not null]
+  title varchar(160) [not null]
+  content text [not null]
+  parent_idea_id varchar(36) [note: '다시 조합하기로 생성된 결과의 원본 아이디어']
+  source varchar(16) [not null, note: 'gemini 또는 mock']
+  hidden tinyint(1) [not null, default: 0, note: '숨김이면 결과와 공유와 피드에서 제외']
+  created_at timestamp(6) [not null]
+  indexes {
+    combo_key [unique, name: 'combo_key']
+    category_id [name: 'fk_idea_category']
+    parent_idea_id [name: 'fk_idea_parent']
+  }
+  Note: 'AI 아이디어 결과. 조합 키 재사용과 재조합 원본 연결을 관리한다.'
+}
+
+Table idea_words {
+  id varchar(36) [pk, not null]
+  idea_id varchar(36) [not null]
+  word_id varchar(36) [not null]
+  position int [not null, note: '표시 순서 0부터 2']
+  indexes {
+    word_id [name: 'fk_iw_word']
+    (idea_id, position) [unique, name: 'uq_idea_position']
+    (idea_id, word_id) [unique, name: 'uq_idea_word']
+  }
+  checks {
+    `(position between 0 and 2)` [name: 'ck_iw_position']
+  }
+  Note: '아이디어에 사용한 단어 세 개와 표시 순서 0부터 2를 보관한다.'
+}
+
+Table recipes {
+  idea_id varchar(36) [pk, not null]
+  kind varchar(16) [not null, note: 'food 또는 plan']
+  feasible tinyint(1) [not null, note: '실현 가능 여부']
+  summary text [not null]
+  ingredients json [not null, note: '재료 또는 준비물 JSON 배열']
+  steps json [not null, note: '실행 순서 JSON 배열']
+  source varchar(16) [not null]
+  created_at timestamp(6) [not null]
+  Note: '아이디어별 만드는 법. 아이디어 하나에 최대 한 개이며 재료와 단계는 JSON이다.'
+}
+
+Table posts {
+  id varchar(36) [pk, not null]
+  idea_id varchar(36) [not null]
+  user_idx bigint [not null]
+  scope varchar(16) [not null, note: 'link 또는 feed']
+  share_code varchar(64) [not null, note: '공개 공유 URL에 사용하는 임의 코드']
+  hidden tinyint(1) [not null, default: 0]
+  created_at timestamp(6) [not null]
+  indexes {
+    user_idx [name: 'fk_post_user']
+    (scope, hidden, created_at, id) [name: 'ix_post_feed']
+    share_code [unique, name: 'share_code']
+    (idea_id, user_idx, scope) [unique, name: 'uq_post_owner_scope']
+  }
+  checks {
+    `(scope in ('link','feed'))` [name: 'ck_post_scope']
+  }
+  Note: '링크 공유와 피드 게시. link는 피드에 노출하지 않고 feed만 피드에 표시한다.'
+}
+
+Table reactions {
+  id varchar(36) [pk, not null]
+  post_id varchar(36) [not null]
+  user_idx bigint [not null]
+  kind varchar(16) [not null, note: 'like 또는 meh 또는 dislike']
+  updated_at timestamp(6) [not null]
+  indexes {
+    user_idx [name: 'fk_reaction_user']
+    (post_id, kind) [name: 'ix_reaction_counts']
+    (post_id, user_idx) [unique, name: 'uq_reaction_user']
+  }
+  checks {
+    `(kind in ('like','meh','dislike'))` [name: 'ck_reaction_kind']
+  }
+  Note: '회원당 게시글 반응 한 개. 반응 변경은 갱신하고 취소는 삭제한다.'
+}
+
+Table match_cache {
+  cache_key varchar(64) [pk, not null]
+  input_text varchar(200) [not null]
+  result json [not null, note: '검증한 기존 단어 ID의 JSON 배열']
+  expires_at timestamp(6) [not null]
+  indexes {
+    expires_at [name: 'ix_match_expiry']
+  }
+  Note: 'AI 연관 단어 선택 결과와 만료 시각을 저장하는 내부 캐시이다.'
+}
+
+Table ip {
+  id bigint [pk, not null, increment]
+  ip_type IpType
+  ip_range IpRange
+  ip varchar(255)
+  Note: '기존 IP 접근 제어 기반 테이블. 학생의 핵심 화면 흐름과 직접 연결되지 않는다.'
+}
+
+Ref fk_category_user: categories.created_by >? users.idx
+Ref fk_cw_category: category_words.category_id > categories.id
+Ref fk_cw_word: category_words.word_id > words.id
+Ref fk_iw_idea: idea_words.idea_id > ideas.id
+Ref fk_iw_word: idea_words.word_id > words.id
+Ref fk_idea_category: ideas.category_id > categories.id
+Ref fk_idea_parent: ideas.parent_idea_id >? ideas.id
+Ref fk_post_idea: posts.idea_id > ideas.id
+Ref fk_post_user: posts.user_idx > users.idx
+Ref fk_reaction_post: reactions.post_id > posts.id
+Ref fk_reaction_user: reactions.user_idx > users.idx
+Ref fk_recipe_idea: ideas.id - recipes.idea_id

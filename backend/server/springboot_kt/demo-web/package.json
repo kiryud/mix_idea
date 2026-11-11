@@ -1,0 +1,26 @@
+{
+	"name": "idea-support-demo",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
+		"test": "vitest run --reporter=verbose --reporter=junit --outputFile=test-results/junit.xml",
+		"test:watch": "vitest",
+		"build": "npm run test && vite build",
+		"preview": "vite preview --host 127.0.0.1 --port 5173 --strictPort"
+	},
+	"dependencies": {
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	},
+	"devDependencies": {
+		"@testing-library/jest-dom": "^6.6.0",
+		"@testing-library/react": "^16.3.0",
+		"@testing-library/user-event": "^14.6.0",
+		"@vitejs/plugin-react": "^5.0.0",
+		"jsdom": "^26.1.0",
+		"vite": "^7.0.0",
+		"vitest": "^3.2.0"
+	}
+}

@@ -1,0 +1,64 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-sample-table
+      author: 작성자
+      comments: sample 테이블 생성
+      preConditions:
+        onFail: MARK_RAN
+        onError: CONTINUE
+        not:
+          tableExists:
+            tableName: sample
+      changes:
+        - createTable:
+            tableName: sample
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                    autoIncrement: true
+              - column:
+                  name: name
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: add-column-age-to-sample
+      author: 작성자
+      comments: sample 테이블에 age 컬럼 추가
+      changes:
+        - addColumn:
+            tableName: sample
+            columns:
+              - column:
+                  name: age
+                  type: VARCHAR(4)
+                  constraints:
+                    nullable: true
+  - changeSet:
+      id: modify-age-column
+      author: 작성자
+      comments: sample 테이블의 age 컬럼 타입 변경
+      changes:
+        - modifyDataType:
+            tableName: sample
+            columnName: age
+            newDataType: INT
+  - changeSet:
+      id: drop-age-column
+      author: 작성자
+      comments: sampel 테이블의 age 컬럼 삭제
+      changes:
+        - dropColumn:
+            tableName: sample
+            columnName: age
+  - changeSet:
+      id: drop-sample-table
+      author: 작성자
+      comments: sample 테이블 삭제
+      changes:
+        - dropTable:
+            tableName: sample

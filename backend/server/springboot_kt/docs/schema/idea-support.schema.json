@@ -1,0 +1,1256 @@
+{
+  "databaseType": "MySQL",
+  "capturedDate": "2026-10-27",
+  "columns": [
+    {
+      "name": "id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "categories",
+      "default": null,
+      "ordinal": 1,
+      "nullable": "NO"
+    },
+    {
+      "name": "name",
+      "type": "varchar(50)",
+      "extra": "",
+      "table": "categories",
+      "default": null,
+      "ordinal": 2,
+      "nullable": "NO"
+    },
+    {
+      "name": "name_key",
+      "type": "varchar(150)",
+      "extra": "",
+      "table": "categories",
+      "default": null,
+      "ordinal": 3,
+      "nullable": "NO"
+    },
+    {
+      "name": "kind",
+      "type": "varchar(16)",
+      "extra": "",
+      "table": "categories",
+      "default": null,
+      "ordinal": 4,
+      "nullable": "NO"
+    },
+    {
+      "name": "created_by",
+      "type": "bigint",
+      "extra": "",
+      "table": "categories",
+      "default": null,
+      "ordinal": 5,
+      "nullable": "YES"
+    },
+    {
+      "name": "use_count",
+      "type": "bigint",
+      "extra": "",
+      "table": "categories",
+      "default": "0",
+      "ordinal": 6,
+      "nullable": "NO"
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp(6)",
+      "extra": "",
+      "table": "categories",
+      "default": null,
+      "ordinal": 7,
+      "nullable": "NO"
+    },
+    {
+      "name": "id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "category_words",
+      "default": null,
+      "ordinal": 1,
+      "nullable": "NO"
+    },
+    {
+      "name": "category_id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "category_words",
+      "default": null,
+      "ordinal": 2,
+      "nullable": "NO"
+    },
+    {
+      "name": "word_id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "category_words",
+      "default": null,
+      "ordinal": 3,
+      "nullable": "NO"
+    },
+    {
+      "name": "score",
+      "type": "double",
+      "extra": "",
+      "table": "category_words",
+      "default": "1",
+      "ordinal": 4,
+      "nullable": "NO"
+    },
+    {
+      "name": "id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "idea_words",
+      "default": null,
+      "ordinal": 1,
+      "nullable": "NO"
+    },
+    {
+      "name": "idea_id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "idea_words",
+      "default": null,
+      "ordinal": 2,
+      "nullable": "NO"
+    },
+    {
+      "name": "word_id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "idea_words",
+      "default": null,
+      "ordinal": 3,
+      "nullable": "NO"
+    },
+    {
+      "name": "position",
+      "type": "int",
+      "extra": "",
+      "table": "idea_words",
+      "default": null,
+      "ordinal": 4,
+      "nullable": "NO"
+    },
+    {
+      "name": "id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "ideas",
+      "default": null,
+      "ordinal": 1,
+      "nullable": "NO"
+    },
+    {
+      "name": "category_id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "ideas",
+      "default": null,
+      "ordinal": 2,
+      "nullable": "NO"
+    },
+    {
+      "name": "combo_key",
+      "type": "varchar(128)",
+      "extra": "",
+      "table": "ideas",
+      "default": null,
+      "ordinal": 3,
+      "nullable": "NO"
+    },
+    {
+      "name": "direction",
+      "type": "varchar(200)",
+      "extra": "",
+      "table": "ideas",
+      "default": null,
+      "ordinal": 4,
+      "nullable": "NO"
+    },
+    {
+      "name": "title",
+      "type": "varchar(160)",
+      "extra": "",
+      "table": "ideas",
+      "default": null,
+      "ordinal": 5,
+      "nullable": "NO"
+    },
+    {
+      "name": "content",
+      "type": "text",
+      "extra": "",
+      "table": "ideas",
+      "default": null,
+      "ordinal": 6,
+      "nullable": "NO"
+    },
+    {
+      "name": "parent_idea_id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "ideas",
+      "default": null,
+      "ordinal": 7,
+      "nullable": "YES"
+    },
+    {
+      "name": "source",
+      "type": "varchar(16)",
+      "extra": "",
+      "table": "ideas",
+      "default": null,
+      "ordinal": 8,
+      "nullable": "NO"
+    },
+    {
+      "name": "hidden",
+      "type": "tinyint(1)",
+      "extra": "",
+      "table": "ideas",
+      "default": "0",
+      "ordinal": 9,
+      "nullable": "NO"
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp(6)",
+      "extra": "",
+      "table": "ideas",
+      "default": null,
+      "ordinal": 10,
+      "nullable": "NO"
+    },
+    {
+      "name": "id",
+      "type": "bigint",
+      "extra": "auto_increment",
+      "table": "ip",
+      "default": null,
+      "ordinal": 1,
+      "nullable": "NO"
+    },
+    {
+      "name": "ip_type",
+      "type": "enum('ALLOW','DENY')",
+      "extra": "",
+      "table": "ip",
+      "default": null,
+      "ordinal": 2,
+      "nullable": "YES"
+    },
+    {
+      "name": "ip_range",
+      "type": "enum('ALL','USER','ADMIN')",
+      "extra": "",
+      "table": "ip",
+      "default": null,
+      "ordinal": 3,
+      "nullable": "YES"
+    },
+    {
+      "name": "ip",
+      "type": "varchar(255)",
+      "extra": "",
+      "table": "ip",
+      "default": null,
+      "ordinal": 4,
+      "nullable": "YES"
+    },
+    {
+      "name": "cache_key",
+      "type": "varchar(64)",
+      "extra": "",
+      "table": "match_cache",
+      "default": null,
+      "ordinal": 1,
+      "nullable": "NO"
+    },
+    {
+      "name": "input_text",
+      "type": "varchar(200)",
+      "extra": "",
+      "table": "match_cache",
+      "default": null,
+      "ordinal": 2,
+      "nullable": "NO"
+    },
+    {
+      "name": "result",
+      "type": "json",
+      "extra": "",
+      "table": "match_cache",
+      "default": null,
+      "ordinal": 3,
+      "nullable": "NO"
+    },
+    {
+      "name": "expires_at",
+      "type": "timestamp(6)",
+      "extra": "",
+      "table": "match_cache",
+      "default": null,
+      "ordinal": 4,
+      "nullable": "NO"
+    },
+    {
+      "name": "id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "posts",
+      "default": null,
+      "ordinal": 1,
+      "nullable": "NO"
+    },
+    {
+      "name": "idea_id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "posts",
+      "default": null,
+      "ordinal": 2,
+      "nullable": "NO"
+    },
+    {
+      "name": "user_idx",
+      "type": "bigint",
+      "extra": "",
+      "table": "posts",
+      "default": null,
+      "ordinal": 3,
+      "nullable": "NO"
+    },
+    {
+      "name": "scope",
+      "type": "varchar(16)",
+      "extra": "",
+      "table": "posts",
+      "default": null,
+      "ordinal": 4,
+      "nullable": "NO"
+    },
+    {
+      "name": "share_code",
+      "type": "varchar(64)",
+      "extra": "",
+      "table": "posts",
+      "default": null,
+      "ordinal": 5,
+      "nullable": "NO"
+    },
+    {
+      "name": "hidden",
+      "type": "tinyint(1)",
+      "extra": "",
+      "table": "posts",
+      "default": "0",
+      "ordinal": 6,
+      "nullable": "NO"
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp(6)",
+      "extra": "",
+      "table": "posts",
+      "default": null,
+      "ordinal": 7,
+      "nullable": "NO"
+    },
+    {
+      "name": "id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "reactions",
+      "default": null,
+      "ordinal": 1,
+      "nullable": "NO"
+    },
+    {
+      "name": "post_id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "reactions",
+      "default": null,
+      "ordinal": 2,
+      "nullable": "NO"
+    },
+    {
+      "name": "user_idx",
+      "type": "bigint",
+      "extra": "",
+      "table": "reactions",
+      "default": null,
+      "ordinal": 3,
+      "nullable": "NO"
+    },
+    {
+      "name": "kind",
+      "type": "varchar(16)",
+      "extra": "",
+      "table": "reactions",
+      "default": null,
+      "ordinal": 4,
+      "nullable": "NO"
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp(6)",
+      "extra": "",
+      "table": "reactions",
+      "default": null,
+      "ordinal": 5,
+      "nullable": "NO"
+    },
+    {
+      "name": "idea_id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "recipes",
+      "default": null,
+      "ordinal": 1,
+      "nullable": "NO"
+    },
+    {
+      "name": "kind",
+      "type": "varchar(16)",
+      "extra": "",
+      "table": "recipes",
+      "default": null,
+      "ordinal": 2,
+      "nullable": "NO"
+    },
+    {
+      "name": "feasible",
+      "type": "tinyint(1)",
+      "extra": "",
+      "table": "recipes",
+      "default": null,
+      "ordinal": 3,
+      "nullable": "NO"
+    },
+    {
+      "name": "summary",
+      "type": "text",
+      "extra": "",
+      "table": "recipes",
+      "default": null,
+      "ordinal": 4,
+      "nullable": "NO"
+    },
+    {
+      "name": "ingredients",
+      "type": "json",
+      "extra": "",
+      "table": "recipes",
+      "default": null,
+      "ordinal": 5,
+      "nullable": "NO"
+    },
+    {
+      "name": "steps",
+      "type": "json",
+      "extra": "",
+      "table": "recipes",
+      "default": null,
+      "ordinal": 6,
+      "nullable": "NO"
+    },
+    {
+      "name": "source",
+      "type": "varchar(16)",
+      "extra": "",
+      "table": "recipes",
+      "default": null,
+      "ordinal": 7,
+      "nullable": "NO"
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp(6)",
+      "extra": "",
+      "table": "recipes",
+      "default": null,
+      "ordinal": 8,
+      "nullable": "NO"
+    },
+    {
+      "name": "idx",
+      "type": "bigint",
+      "extra": "auto_increment",
+      "table": "users",
+      "default": null,
+      "ordinal": 1,
+      "nullable": "NO"
+    },
+    {
+      "name": "uid",
+      "type": "varchar(255)",
+      "extra": "",
+      "table": "users",
+      "default": null,
+      "ordinal": 2,
+      "nullable": "NO"
+    },
+    {
+      "name": "id",
+      "type": "varchar(255)",
+      "extra": "",
+      "table": "users",
+      "default": null,
+      "ordinal": 3,
+      "nullable": "YES"
+    },
+    {
+      "name": "pw",
+      "type": "varchar(255)",
+      "extra": "",
+      "table": "users",
+      "default": null,
+      "ordinal": 4,
+      "nullable": "YES"
+    },
+    {
+      "name": "email",
+      "type": "varchar(255)",
+      "extra": "",
+      "table": "users",
+      "default": null,
+      "ordinal": 5,
+      "nullable": "YES"
+    },
+    {
+      "name": "name",
+      "type": "varchar(255)",
+      "extra": "",
+      "table": "users",
+      "default": null,
+      "ordinal": 6,
+      "nullable": "YES"
+    },
+    {
+      "name": "role",
+      "type": "enum('ADMIN','USER')",
+      "extra": "",
+      "table": "users",
+      "default": "USER",
+      "ordinal": 7,
+      "nullable": "NO"
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp",
+      "extra": "",
+      "table": "users",
+      "default": null,
+      "ordinal": 8,
+      "nullable": "YES"
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp",
+      "extra": "",
+      "table": "users",
+      "default": null,
+      "ordinal": 9,
+      "nullable": "YES"
+    },
+    {
+      "name": "id",
+      "type": "varchar(36)",
+      "extra": "",
+      "table": "words",
+      "default": null,
+      "ordinal": 1,
+      "nullable": "NO"
+    },
+    {
+      "name": "text",
+      "type": "varchar(150)",
+      "extra": "",
+      "table": "words",
+      "default": null,
+      "ordinal": 2,
+      "nullable": "NO"
+    },
+    {
+      "name": "text_key",
+      "type": "varchar(150)",
+      "extra": "",
+      "table": "words",
+      "default": null,
+      "ordinal": 3,
+      "nullable": "NO"
+    },
+    {
+      "name": "keywords",
+      "type": "text",
+      "extra": "",
+      "table": "words",
+      "default": null,
+      "ordinal": 4,
+      "nullable": "NO"
+    }
+  ],
+  "keys": [
+    {
+      "name": "fk_category_user",
+      "table": "categories",
+      "column": "created_by",
+      "ordinal": 1,
+      "targetTable": "users",
+      "targetColumn": "idx"
+    },
+    {
+      "name": "name_key",
+      "table": "categories",
+      "column": "name_key",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "PRIMARY",
+      "table": "categories",
+      "column": "id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "fk_cw_category",
+      "table": "category_words",
+      "column": "category_id",
+      "ordinal": 1,
+      "targetTable": "categories",
+      "targetColumn": "id"
+    },
+    {
+      "name": "fk_cw_word",
+      "table": "category_words",
+      "column": "word_id",
+      "ordinal": 1,
+      "targetTable": "words",
+      "targetColumn": "id"
+    },
+    {
+      "name": "PRIMARY",
+      "table": "category_words",
+      "column": "id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uq_category_word",
+      "table": "category_words",
+      "column": "category_id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uq_category_word",
+      "table": "category_words",
+      "column": "word_id",
+      "ordinal": 2,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "fk_iw_idea",
+      "table": "idea_words",
+      "column": "idea_id",
+      "ordinal": 1,
+      "targetTable": "ideas",
+      "targetColumn": "id"
+    },
+    {
+      "name": "fk_iw_word",
+      "table": "idea_words",
+      "column": "word_id",
+      "ordinal": 1,
+      "targetTable": "words",
+      "targetColumn": "id"
+    },
+    {
+      "name": "PRIMARY",
+      "table": "idea_words",
+      "column": "id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uq_idea_position",
+      "table": "idea_words",
+      "column": "idea_id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uq_idea_position",
+      "table": "idea_words",
+      "column": "position",
+      "ordinal": 2,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uq_idea_word",
+      "table": "idea_words",
+      "column": "idea_id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uq_idea_word",
+      "table": "idea_words",
+      "column": "word_id",
+      "ordinal": 2,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "combo_key",
+      "table": "ideas",
+      "column": "combo_key",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "fk_idea_category",
+      "table": "ideas",
+      "column": "category_id",
+      "ordinal": 1,
+      "targetTable": "categories",
+      "targetColumn": "id"
+    },
+    {
+      "name": "fk_idea_parent",
+      "table": "ideas",
+      "column": "parent_idea_id",
+      "ordinal": 1,
+      "targetTable": "ideas",
+      "targetColumn": "id"
+    },
+    {
+      "name": "PRIMARY",
+      "table": "ideas",
+      "column": "id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "PRIMARY",
+      "table": "ip",
+      "column": "id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "PRIMARY",
+      "table": "match_cache",
+      "column": "cache_key",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "fk_post_idea",
+      "table": "posts",
+      "column": "idea_id",
+      "ordinal": 1,
+      "targetTable": "ideas",
+      "targetColumn": "id"
+    },
+    {
+      "name": "fk_post_user",
+      "table": "posts",
+      "column": "user_idx",
+      "ordinal": 1,
+      "targetTable": "users",
+      "targetColumn": "idx"
+    },
+    {
+      "name": "PRIMARY",
+      "table": "posts",
+      "column": "id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "share_code",
+      "table": "posts",
+      "column": "share_code",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uq_post_owner_scope",
+      "table": "posts",
+      "column": "idea_id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uq_post_owner_scope",
+      "table": "posts",
+      "column": "user_idx",
+      "ordinal": 2,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uq_post_owner_scope",
+      "table": "posts",
+      "column": "scope",
+      "ordinal": 3,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "fk_reaction_post",
+      "table": "reactions",
+      "column": "post_id",
+      "ordinal": 1,
+      "targetTable": "posts",
+      "targetColumn": "id"
+    },
+    {
+      "name": "fk_reaction_user",
+      "table": "reactions",
+      "column": "user_idx",
+      "ordinal": 1,
+      "targetTable": "users",
+      "targetColumn": "idx"
+    },
+    {
+      "name": "PRIMARY",
+      "table": "reactions",
+      "column": "id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uq_reaction_user",
+      "table": "reactions",
+      "column": "post_id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uq_reaction_user",
+      "table": "reactions",
+      "column": "user_idx",
+      "ordinal": 2,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "fk_recipe_idea",
+      "table": "recipes",
+      "column": "idea_id",
+      "ordinal": 1,
+      "targetTable": "ideas",
+      "targetColumn": "id"
+    },
+    {
+      "name": "PRIMARY",
+      "table": "recipes",
+      "column": "idea_id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "id",
+      "table": "users",
+      "column": "id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "PRIMARY",
+      "table": "users",
+      "column": "idx",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "uid",
+      "table": "users",
+      "column": "uid",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "PRIMARY",
+      "table": "words",
+      "column": "id",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    },
+    {
+      "name": "text_key",
+      "table": "words",
+      "column": "text_key",
+      "ordinal": 1,
+      "targetTable": null,
+      "targetColumn": null
+    }
+  ],
+  "indexes": [
+    {
+      "name": "fk_category_user",
+      "table": "categories",
+      "column": "created_by",
+      "sequence": 1,
+      "nonUnique": 1
+    },
+    {
+      "name": "ix_category_order",
+      "table": "categories",
+      "column": "kind",
+      "sequence": 1,
+      "nonUnique": 1
+    },
+    {
+      "name": "ix_category_order",
+      "table": "categories",
+      "column": "use_count",
+      "sequence": 2,
+      "nonUnique": 1
+    },
+    {
+      "name": "ix_category_order",
+      "table": "categories",
+      "column": "id",
+      "sequence": 3,
+      "nonUnique": 1
+    },
+    {
+      "name": "name_key",
+      "table": "categories",
+      "column": "name_key",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "PRIMARY",
+      "table": "categories",
+      "column": "id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "fk_cw_word",
+      "table": "category_words",
+      "column": "word_id",
+      "sequence": 1,
+      "nonUnique": 1
+    },
+    {
+      "name": "PRIMARY",
+      "table": "category_words",
+      "column": "id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "uq_category_word",
+      "table": "category_words",
+      "column": "category_id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "uq_category_word",
+      "table": "category_words",
+      "column": "word_id",
+      "sequence": 2,
+      "nonUnique": 0
+    },
+    {
+      "name": "fk_iw_word",
+      "table": "idea_words",
+      "column": "word_id",
+      "sequence": 1,
+      "nonUnique": 1
+    },
+    {
+      "name": "PRIMARY",
+      "table": "idea_words",
+      "column": "id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "uq_idea_position",
+      "table": "idea_words",
+      "column": "idea_id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "uq_idea_position",
+      "table": "idea_words",
+      "column": "position",
+      "sequence": 2,
+      "nonUnique": 0
+    },
+    {
+      "name": "uq_idea_word",
+      "table": "idea_words",
+      "column": "idea_id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "uq_idea_word",
+      "table": "idea_words",
+      "column": "word_id",
+      "sequence": 2,
+      "nonUnique": 0
+    },
+    {
+      "name": "combo_key",
+      "table": "ideas",
+      "column": "combo_key",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "fk_idea_category",
+      "table": "ideas",
+      "column": "category_id",
+      "sequence": 1,
+      "nonUnique": 1
+    },
+    {
+      "name": "fk_idea_parent",
+      "table": "ideas",
+      "column": "parent_idea_id",
+      "sequence": 1,
+      "nonUnique": 1
+    },
+    {
+      "name": "PRIMARY",
+      "table": "ideas",
+      "column": "id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "PRIMARY",
+      "table": "ip",
+      "column": "id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "ix_match_expiry",
+      "table": "match_cache",
+      "column": "expires_at",
+      "sequence": 1,
+      "nonUnique": 1
+    },
+    {
+      "name": "PRIMARY",
+      "table": "match_cache",
+      "column": "cache_key",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "fk_post_user",
+      "table": "posts",
+      "column": "user_idx",
+      "sequence": 1,
+      "nonUnique": 1
+    },
+    {
+      "name": "ix_post_feed",
+      "table": "posts",
+      "column": "scope",
+      "sequence": 1,
+      "nonUnique": 1
+    },
+    {
+      "name": "ix_post_feed",
+      "table": "posts",
+      "column": "hidden",
+      "sequence": 2,
+      "nonUnique": 1
+    },
+    {
+      "name": "ix_post_feed",
+      "table": "posts",
+      "column": "created_at",
+      "sequence": 3,
+      "nonUnique": 1
+    },
+    {
+      "name": "ix_post_feed",
+      "table": "posts",
+      "column": "id",
+      "sequence": 4,
+      "nonUnique": 1
+    },
+    {
+      "name": "PRIMARY",
+      "table": "posts",
+      "column": "id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "share_code",
+      "table": "posts",
+      "column": "share_code",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "uq_post_owner_scope",
+      "table": "posts",
+      "column": "idea_id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "uq_post_owner_scope",
+      "table": "posts",
+      "column": "user_idx",
+      "sequence": 2,
+      "nonUnique": 0
+    },
+    {
+      "name": "uq_post_owner_scope",
+      "table": "posts",
+      "column": "scope",
+      "sequence": 3,
+      "nonUnique": 0
+    },
+    {
+      "name": "fk_reaction_user",
+      "table": "reactions",
+      "column": "user_idx",
+      "sequence": 1,
+      "nonUnique": 1
+    },
+    {
+      "name": "ix_reaction_counts",
+      "table": "reactions",
+      "column": "post_id",
+      "sequence": 1,
+      "nonUnique": 1
+    },
+    {
+      "name": "ix_reaction_counts",
+      "table": "reactions",
+      "column": "kind",
+      "sequence": 2,
+      "nonUnique": 1
+    },
+    {
+      "name": "PRIMARY",
+      "table": "reactions",
+      "column": "id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "uq_reaction_user",
+      "table": "reactions",
+      "column": "post_id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "uq_reaction_user",
+      "table": "reactions",
+      "column": "user_idx",
+      "sequence": 2,
+      "nonUnique": 0
+    },
+    {
+      "name": "PRIMARY",
+      "table": "recipes",
+      "column": "idea_id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "id",
+      "table": "users",
+      "column": "id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "PRIMARY",
+      "table": "users",
+      "column": "idx",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "uid",
+      "table": "users",
+      "column": "uid",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "PRIMARY",
+      "table": "words",
+      "column": "id",
+      "sequence": 1,
+      "nonUnique": 0
+    },
+    {
+      "name": "text_key",
+      "table": "words",
+      "column": "text_key",
+      "sequence": 1,
+      "nonUnique": 0
+    }
+  ],
+  "checks": [
+    {
+      "name": "ck_iw_position",
+      "table": "idea_words",
+      "clause": "(`position` between 0 and 2)"
+    },
+    {
+      "name": "ck_post_scope",
+      "table": "posts",
+      "clause": "(`scope` in (_utf8mb4\\'link\\',_utf8mb4\\'feed\\'))"
+    },
+    {
+      "name": "ck_reaction_kind",
+      "table": "reactions",
+      "clause": "(`kind` in (_utf8mb4\\'like\\',_utf8mb4\\'meh\\',_utf8mb4\\'dislike\\'))"
+    }
+  ]
+}

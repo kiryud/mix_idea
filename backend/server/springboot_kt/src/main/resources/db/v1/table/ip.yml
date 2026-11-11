@@ -1,0 +1,33 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-ip-table-v1
+      author: 김동현
+      comment: ip 테이블 생성
+      preConditions:
+        onFail: MARK_RAN
+        onError: CONTINUE
+        not:
+          - tableExists:
+              tableName: ip
+      changes:
+        - tagDatabase:
+            tag: create-ip-table-20240619
+        - createTable:
+            tableName: ip
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: ip_type
+                  type: enum('ALLOW','DENY')
+              - column:
+                  name: ip_range
+                  type: enum('ALL','USER','ADMIN')
+              - column:
+                  name: ip
+                  type: VARCHAR(255)

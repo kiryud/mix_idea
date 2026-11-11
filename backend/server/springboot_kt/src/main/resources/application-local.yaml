@@ -1,0 +1,20 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_HOST:jdbc:mysql://127.0.0.1:3307/idea_support?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
+    username: ${DB_USERNAME:idea_support}
+    password: ${DB_PASSWORD:}
+  jpa:
+    show-sql: false
+logging:
+  config: classpath:logback-spring-local.xml
+# PC 시연 전용 기본값. 원격 환경은 반드시 환경변수로 설정한다.
+jwt:
+  secret: ${JWT_SECRET:aWRlYS1zdXBwb3J0LWxvY2FsLWRlbW8ta2V5LTAwMDE=}
+sha:
+  key: ${SHA_KEY:idea-support-local-sha}
+aes:
+  key: ${AES_KEY:local-demo-aes-key-32-characters}

@@ -1,0 +1,66 @@
+@baseUrl = http://localhost:8080
+@accessToken = PASTE_ACCESS_TOKEN
+@ideaId = PASTE_IDEA_ID
+@postId = PASTE_POST_ID
+
+### 1. Register a demo member (change the ID to register another member)
+POST {{baseUrl}}/app/user/sign-up
+Content-Type: application/json
+
+{"id":"student-demo","pw":"DemoPassword123!","email":"student@example.com","name":"시연 학생","birth":"2000-01-01"}
+
+### 2. Login and copy accessToken above
+POST {{baseUrl}}/app/user/login
+Content-Type: application/json
+
+{"id":"student-demo","pw":"DemoPassword123!"}
+
+### 3. Server status
+GET {{baseUrl}}/common/health
+
+### 4. Categories
+GET {{baseUrl}}/app/categories
+Authorization: Bearer {{accessToken}}
+
+### 5. Draw words
+POST {{baseUrl}}/app/words/draw
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"categoryId":"aa88393f-142f-5803-a920-3ade6082bbb4"}
+
+### 6. Generate an idea; repeat to verify cached=true
+POST {{baseUrl}}/app/ideas
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"categoryId":"aa88393f-142f-5803-a920-3ade6082bbb4","wordIds":["1fd8d6ed-af7c-54d6-9679-04950118d26f","7e9865ba-d219-558a-b2e0-9fb258aa1d7b","dc7c6955-03b5-5bda-8a15-9e22834d4c05"],"direction":"간편한 캠핑 요리"}
+
+### 7. Recipe (copy the idea ID from step 6)
+POST {{baseUrl}}/app/ideas/{{ideaId}}/recipe
+Authorization: Bearer {{accessToken}}
+
+### 8. Share link
+POST {{baseUrl}}/app/shares
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"ideaId":"{{ideaId}}"}
+
+### 9. Publish to feed
+POST {{baseUrl}}/app/posts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"ideaId":"{{ideaId}}"}
+
+### 10. Feed
+GET {{baseUrl}}/app/posts?sort=latest&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 11. React using a DIFFERENT member token
+PUT {{baseUrl}}/app/posts/{{postId}}/reaction
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"kind":"like"}

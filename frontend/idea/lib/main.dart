@@ -1,22 +1,34 @@
-// 아이디어 뽑기 — 홈 + 아이디어 기록 목업 (백엔드 없음, 상태는 메모리에만 저장)
-// 구성: 데이터/모델 → 테마 팔레트 → 전역 저장소 → 앱/드로어 → 홈 화면 → 기록 화면
+// 아이디어 뽑기 — 플러터 프론트엔드 (스프링부트 백엔드 REST API 완전 연동 + 오프라인 목업 Fallback)
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-void main() {
+import 'models/models.dart';
+import 'services/api_service.dart';
+import 'services/storage_service.dart';
+import 'screens/login_screen.dart';
+import 'screens/feed_screen.dart';
+import 'screens/guide_dialog.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   ErrorWidget.builder = (FlutterErrorDetails details) {
     if (details.exceptionAsString().contains('overflowed')) {
       return const SizedBox.shrink();
     }
     return ErrorWidget(details.exception);
   };
+
+  await ApiService().init();
+  await StorageService().init();
+
   runApp(const IdeaApp());
 }
 
-/* ───────────── 데이터 / 모델 ───────────── */
+/* ───────────── 오프라인 Fallback 목업 데이터 ───────────── */
 
-const Map<String, List<String>> kData = {
+const Map<String, List<String>> kFallbackData = {
   '동물': ['수달', '올빼미', '문어', '고슴도치', '펭귄', '카멜레온', '너구리', '해파리', '알파카', '두더지'],
   '직업': ['소방관', '사서', '우주비행사', '바리스타', '수의사', '가이드', '정원사', '작곡가', '사진작가', '요리사'],
   '장소': ['도서관', '지하철역', '등대', '놀이공원', '옥상정원', '시장', '수족관', '기차역', '전망대', '박물관'],
@@ -28,62 +40,8 @@ const Map<String, List<String>> kData = {
   '악기': ['기타', '트럼펫', '피아노', '바이올린', '드럼', '플루트', '하프', '오카리나', '첼로', '색소폰'],
   '탈것': ['기차', '자전거', '열기구', '케이블카', '트램', '스쿠터', '범선', '버스', '비행기', '킥보드'],
 };
-final List<String> kCats = kData.keys.toList();
-const int kMinCount = 1, kMaxCount = 9;
 
-enum Tier { rare, epic, unique, legend, mystic }
-
-const Map<Tier, String> kTierName = {
-  Tier.rare: '레어',
-  Tier.epic: '에픽',
-  Tier.unique: '유니크',
-  Tier.legend: '레전드리',
-  Tier.mystic: '미스틱',
-};
-int rank(Tier t) => t.index + 1;
-bool glows(Tier t) => rank(t) >= 3; // 빛 효과는 유니크부터
-
-Tier randTier(Random r) {
-  final x = r.nextDouble();
-  if (x < .52) return Tier.rare;
-  if (x < .80) return Tier.epic;
-  if (x < .94) return Tier.unique;
-  if (x < .98) return Tier.legend;
-  return Tier.mystic;
-}
-
-Tier bestOf(Iterable<Tier> ts) => ts.reduce((a, b) => rank(b) > rank(a) ? b : a);
-
-class W {
-  String word;
-  Tier tier;
-  bool locked;
-  bool rolling;
-  W(this.word, this.tier, {this.locked = false, this.rolling = false});
-  W copy() => W(word, tier, locked: locked);
-}
-
-class WT {
-  final String word;
-  final Tier tier;
-  const WT(this.word, this.tier);
-}
-
-class Idea {
-  final List<WT> words;
-  final Tier grade;
-  final String text;
-  final int tIdx;
-  const Idea(this.words, this.grade, this.text, this.tIdx);
-}
-
-class SavedIdea {
-  final int id;
-  final String cat;
-  final DateTime at;
-  final Idea idea;
-  SavedIdea(this.id, this.cat, this.at, this.idea);
-}
+final List<String> kFallbackCats = kFallbackData.keys.toList();
 
 class Tpl {
   final int min;
@@ -103,31 +61,42 @@ final List<Tpl> kTemplates = [
   Tpl(1, (w) => '${w.join('·')} 도감 서비스. 서로 닮은 점과 다른 점을 한 화면에서 비교한다.'),
 ];
 
-/// 등급이 높을수록 아이디어가 구체적이 된다. 가장 높은 등급 단어가 핵심 키워드로 맨 앞에 온다.
 String extraText(Tier g, List<String> w) {
   switch (g) {
     case Tier.rare:
       return '';
     case Tier.epic:
-      return ' 핵심 키워드는 “${w[0]}”. 이 단어를 중심 규칙으로 삼아 비슷한 앱과 다른 점을 만든다.';
+      return ' 핵심 키워드는 “${w.isNotEmpty ? w[0] : ''}”. 이 단어를 중심 규칙으로 삼아 비슷한 앱과 다른 점을 만든다.';
     case Tier.unique:
-      return ' 핵심 키워드는 “${w[0]}”. 이 단어를 중심 규칙으로 삼고, 결과를 친구에게 공유하는 기능까지 넣어 출시 첫 주 목표를 잡는다.';
+      return ' 핵심 키워드는 “${w.isNotEmpty ? w[0] : ''}”. 이 단어를 중심 규칙으로 삼고, 결과를 친구에게 공유하는 기능까지 넣어 출시 첫 주 목표를 잡는다.';
     case Tier.legend:
-      return ' 핵심 키워드는 “${w[0]}”. 중심 규칙, 공유 기능, 시즌 이벤트까지 갖춘 완성형 기획이다. 한 줄 소개는 ${_intro(w)}.';
+      return ' 핵심 키워드는 “${w.isNotEmpty ? w[0] : ''}”. 중심 규칙, 공유 기능, 시즌 이벤트까지 갖춘 완성형 기획이다. 한 줄 소개는 ${_intro(w)}.';
     case Tier.mystic:
-      return ' 핵심 키워드는 “${w[0]}”. 중심 규칙, 공유 기능, 시즌 이벤트에 더해 처음 보는 사람도 바로 따라 쓰는 튜토리얼까지 갖춘 출시 직전 기획이다. 한 줄 소개는 ${_intro(w)}. 거의 나오지 않는 희귀한 조합이다.';
+      return ' 핵심 키워드는 “${w.isNotEmpty ? w[0] : ''}”. 중심 규칙, 공유 기능, 시즌 이벤트에 더해 처음 보는 사람도 바로 따라 쓰는 튜토리얼까지 갖춘 출시 직전 기획이다. 한 줄 소개는 ${_intro(w)}. 거의 나오지 않는 희귀한 조합이다.';
   }
 }
 
-Idea makeIdea(List<WT> ws, {int? forced, int prev = -1, Random? rnd}) {
+IdeaItem makeOfflineIdea(List<WordItem> ws, String catName, {int prev = -1, Random? rnd}) {
   final r = rnd ?? Random();
   final ordered = [...ws]..sort((a, b) => rank(b.tier) - rank(a.tier));
-  final w = ordered.map((s) => s.word).toList();
+  final w = ordered.map((s) => s.text).toList();
   final grade = bestOf(ws.map((s) => s.tier));
   final ok = [for (var k = 0; k < kTemplates.length; k++) if (kTemplates[k].min <= w.length) k];
   final others = ok.where((k) => k != prev).toList();
-  final i = forced != null && ok.contains(forced) ? forced : (others.isNotEmpty ? others[r.nextInt(others.length)] : ok.first);
-  return Idea(ordered, grade, kTemplates[i].f(w) + extraText(grade, w), i);
+  final i = others.isNotEmpty ? others[r.nextInt(others.length)] : (ok.isNotEmpty ? ok.first : 0);
+  final text = (ok.isNotEmpty ? kTemplates[i].f(w) : '아이디어') + extraText(grade, w);
+
+  return IdeaItem(
+    id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+    categoryId: 'local_cat',
+    categoryName: catName,
+    title: w.isNotEmpty ? '${w.join(" × ")} 기획' : '아이디어',
+    content: text,
+    words: ordered,
+    grade: grade,
+    source: 'mock',
+    createdAt: DateTime.now(),
+  );
 }
 
 String whenLabel(DateTime at) {
@@ -177,20 +146,26 @@ Color tierColor(BuildContext c, Tier t) {
 const kGold = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFFFD65C), Color(0xFFE8A11C)]);
 const kGoldInk = Color(0xFF2B1D00);
 
-/* ───────────── 전역 저장소 (메모리) ───────────── */
+/* ───────────── 전역 앱 상태 ───────────── */
 
-class Store extends ChangeNotifier {
+class AppState extends ChangeNotifier {
   ThemeMode mode = ThemeMode.system;
-  final List<SavedIdea> saved = [];
+  bool guestMode = false;
 
-  void setMode(ThemeMode m) { mode = m; notifyListeners(); }
-  void add(String cat, Idea idea) { saved.insert(0, SavedIdea(DateTime.now().microsecondsSinceEpoch, cat, DateTime.now(), idea)); notifyListeners(); }
-  void remove(int id) { saved.removeWhere((s) => s.id == id); notifyListeners(); }
+  void setMode(ThemeMode m) {
+    mode = m;
+    notifyListeners();
+  }
+
+  void setGuestMode(bool v) {
+    guestMode = v;
+    notifyListeners();
+  }
 }
 
-final Store store = Store();
+final AppState appState = AppState();
 
-/* ───────────── 앱 / 드로어 ───────────── */
+/* ───────────── 루트 앱 위젯 ───────────── */
 
 ThemeData _theme(Brightness b) {
   final p = b == Brightness.dark ? Pal.dark : Pal.light;
@@ -198,9 +173,17 @@ ThemeData _theme(Brightness b) {
     useMaterial3: true,
     brightness: b,
     scaffoldBackgroundColor: p.bg,
-    colorScheme: ColorScheme.fromSeed(seedColor: p.accent, brightness: b).copyWith(surface: p.card, primary: p.accent, onPrimary: p.accentInk),
+    colorScheme: ColorScheme.fromSeed(seedColor: p.accent, brightness: b).copyWith(
+      surface: p.card,
+      primary: p.accent,
+      onPrimary: p.accentInk,
+    ),
     appBarTheme: AppBarTheme(
-      backgroundColor: p.bg, foregroundColor: p.ink, elevation: 0, scrolledUnderElevation: 0, centerTitle: true,
+      backgroundColor: p.bg,
+      foregroundColor: p.ink,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: true,
       titleTextStyle: TextStyle(color: p.ink, fontSize: 20, fontWeight: FontWeight.w700),
     ),
     drawerTheme: DrawerThemeData(backgroundColor: p.card),
@@ -210,70 +193,196 @@ ThemeData _theme(Brightness b) {
 
 class IdeaApp extends StatelessWidget {
   const IdeaApp({super.key});
+
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: store,
-        builder: (context, _) => MaterialApp(
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: appState,
+      builder: (context, _) {
+        final api = ApiService();
+        final showLogin = !api.isLoggedIn && !appState.guestMode;
+
+        return MaterialApp(
           title: '아이디어 뽑기',
           debugShowCheckedModeBanner: false,
-          themeMode: store.mode,
+          themeMode: appState.mode,
           theme: _theme(Brightness.light),
           darkTheme: _theme(Brightness.dark),
-          home: const HomePage(),
-        ),
-      );
+          home: showLogin
+              ? LoginScreen(
+                  onLoginSuccess: () => appState.setGuestMode(false),
+                  onGuestMode: () => appState.setGuestMode(true),
+                )
+              : const HomePage(),
+        );
+      },
+    );
+  }
 }
 
-enum Dest { home, log }
+/* ───────────── 앱 드로어 ───────────── */
+
+enum Dest { home, feed, log }
 
 class AppDrawer extends StatelessWidget {
   final Dest current;
   const AppDrawer(this.current, {super.key});
 
+  void _showServerSettings(BuildContext context) {
+    final api = ApiService();
+    final ctrl = TextEditingController(text: api.baseUrl);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('스프링부트 서버 주소'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '백엔드 API URL을 설정합니다:\n(Desktop/Web: http://localhost:8080)\n(Android 에뮬레이터: http://10.0.2.2:8080)',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
+          FilledButton(
+            onPressed: () async {
+              await api.setBaseUrl(ctrl.text.trim());
+              if (context.mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('서버 주소: ${api.baseUrl}')),
+                );
+              }
+            },
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final api = ApiService();
+    final session = api.session;
+    final storage = StorageService();
+
     return Drawer(
       child: SafeArea(
-        child: ListenableBuilder(
-          listenable: store,
-          builder: (context, _) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(padding: const EdgeInsets.fromLTRB(20, 20, 20, 12), child: Text('아이디어 뽑기', style: TextStyle(color: p.ink, fontSize: 20, fontWeight: FontWeight.w700))),
-            ListTile(
-              selected: current == Dest.home, selectedColor: p.accent, selectedTileColor: p.accentSoft,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              title: const Text('홈'),
-              onTap: () {
-                Navigator.pop(context); // 드로어 닫기
-                if (current != Dest.home) Navigator.pop(context); // 기록 → 홈
-              },
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
+            child: Row(
+              children: [
+                Icon(Icons.lightbulb, color: p.accent, size: 28),
+                const SizedBox(width: 8),
+                Text('아이디어 뽑기', style: TextStyle(color: p.ink, fontSize: 20, fontWeight: FontWeight.w700)),
+              ],
             ),
-            ListTile(
-              selected: current == Dest.log, selectedColor: p.accent, selectedTileColor: p.accentSoft,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              title: const Text('아이디어 로그'),
-              trailing: Badge(label: Text('${store.saved.length}'), isLabelVisible: store.saved.isNotEmpty, backgroundColor: p.accent, textColor: p.accentInk),
-              onTap: () {
-                Navigator.pop(context);
-                if (current != Dest.log) Navigator.push(context, MaterialPageRoute(builder: (_) => const LogPage()));
-              },
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: Text(
+              api.isLoggedIn
+                  ? '👤 ${session?.name ?? session?.id ?? ""} 님 (${session?.id ?? ""})'
+                  : '👤 게스트 모드 (오프라인)',
+              style: TextStyle(color: p.muted, fontSize: 13, fontWeight: FontWeight.w600),
             ),
-            const Spacer(),
-            SwitchListTile(
-              title: const Text('다크 모드'),
-              value: dark,
-              onChanged: (v) => store.setMode(v ? ThemeMode.dark : ThemeMode.light),
+          ),
+          const Divider(),
+
+          ListTile(
+            leading: const Icon(Icons.home_outlined),
+            selected: current == Dest.home,
+            selectedColor: p.accent,
+            selectedTileColor: p.accentSoft,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text('홈 (아이디어 뽑기)'),
+            onTap: () {
+              Navigator.pop(context);
+              if (current != Dest.home) {
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage()));
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.dynamic_feed_outlined),
+            selected: current == Dest.feed,
+            selectedColor: p.accent,
+            selectedTileColor: p.accentSoft,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text('피드 (공유된 아이디어)'),
+            onTap: () {
+              Navigator.pop(context);
+              if (current != Dest.feed) {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const FeedScreen()));
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.bookmark_outline),
+            selected: current == Dest.log,
+            selectedColor: p.accent,
+            selectedTileColor: p.accentSoft,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text('아이디어 기록'),
+            trailing: ListenableBuilder(
+              listenable: storage,
+              builder: (ctx, _) => Badge(
+                label: Text('${storage.records.length}'),
+                isLabelVisible: storage.records.isNotEmpty,
+                backgroundColor: p.accent,
+                textColor: p.accentInk,
+              ),
             ),
-            ListTile(
-              title: Text('로그아웃', style: TextStyle(color: p.muted)),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('목업이라 로그인 화면은 아직 없어요.')));
-              },
-            ),
-          ]),
-        ),
+            onTap: () {
+              Navigator.pop(context);
+              if (current != Dest.log) {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const LogPage()));
+              }
+            },
+          ),
+
+          const Spacer(),
+          const Divider(),
+
+          ListTile(
+            leading: const Icon(Icons.dns_outlined),
+            title: const Text('서버 URL 설정'),
+            subtitle: Text(api.baseUrl, style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis),
+            onTap: () => _showServerSettings(context),
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.dark_mode_outlined),
+            title: const Text('다크 모드'),
+            value: dark,
+            onChanged: (v) => appState.setMode(v ? ThemeMode.dark : ThemeMode.light),
+          ),
+          ListTile(
+            leading: Icon(api.isLoggedIn ? Icons.logout : Icons.login, color: p.muted),
+            title: Text(api.isLoggedIn ? '로그아웃' : '로그인하러 가기', style: TextStyle(color: p.muted)),
+            onTap: () async {
+              Navigator.pop(context);
+              if (api.isLoggedIn) {
+                await api.logout();
+                appState.setGuestMode(false);
+              } else {
+                appState.setGuestMode(false);
+              }
+            },
+          ),
+        ]),
       ),
     );
   }
@@ -293,6 +402,7 @@ class GoldButton extends StatelessWidget {
   final IconData? icon;
   final VoidCallback? onPressed;
   const GoldButton({super.key, required this.label, this.icon, this.onPressed});
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
@@ -317,40 +427,132 @@ class GoldButton extends StatelessWidget {
   }
 }
 
-/* 아이디어 카드: 홈 미리보기와 기록 목록이 같은 모양을 쓴다 */
+/* ───────────── 아이디어 카드 위젯 ───────────── */
+
 class IdeaCard extends StatelessWidget {
-  final Idea idea;
+  final IdeaItem idea;
   final String tag;
   final bool clamp;
-  const IdeaCard({super.key, required this.idea, required this.tag, this.clamp = false});
+  final VoidCallback? onGuide;
+  final VoidCallback? onShare;
+  final VoidCallback? onPost;
+
+  const IdeaCard({
+    super.key,
+    required this.idea,
+    required this.tag,
+    this.clamp = false,
+    this.onGuide,
+    this.onShare,
+    this.onPost,
+  });
+
   @override
   Widget build(BuildContext context) {
     final p = Pal.of(context);
     final tc = tierColor(context, idea.grade);
+
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: p.card, borderRadius: BorderRadius.circular(18), border: Border.all(color: tc),
+        color: p.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: tc),
         boxShadow: glows(idea.grade) ? [BoxShadow(color: tc.withValues(alpha: .35), blurRadius: 18, spreadRadius: -6)] : null,
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Flexible(child: Text(tag, style: TextStyle(color: p.muted, fontSize: 12))),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            decoration: BoxDecoration(border: Border.all(color: tc), borderRadius: BorderRadius.circular(99)),
-            child: Text('${kTierName[idea.grade]}${clamp ? '' : ' 아이디어'}', style: TextStyle(color: tc, fontSize: 12, fontWeight: FontWeight.w600)),
+          Flexible(
+            child: Text(
+              idea.title.isNotEmpty ? idea.title : tag,
+              style: TextStyle(color: p.muted, fontSize: 13, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (idea.source == 'mock')
+                Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
+                  child: const Text('Mock', style: TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                decoration: BoxDecoration(border: Border.all(color: tc), borderRadius: BorderRadius.circular(99)),
+                child: Text('${kTierName[idea.grade]}${clamp ? '' : ' 아이디어'}', style: TextStyle(color: tc, fontSize: 12, fontWeight: FontWeight.w600)),
+              ),
+            ],
           ),
         ]),
         const SizedBox(height: 8),
-        Text.rich(TextSpan(children: [
-          for (var i = 0; i < idea.words.length; i++) ...[
-            if (i > 0) TextSpan(text: ' × ', style: TextStyle(color: p.ink)),
-            TextSpan(text: idea.words[i].word, style: TextStyle(color: tierColor(context, idea.words[i].tier))),
-          ],
-        ]), style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700, height: 1.3)),
+
+        // 단어 태그들
+        if (idea.words.isNotEmpty)
+          Text.rich(
+            TextSpan(children: [
+              for (var i = 0; i < idea.words.length; i++) ...[
+                if (i > 0) TextSpan(text: ' × ', style: TextStyle(color: p.ink)),
+                TextSpan(text: idea.words[i].text, style: TextStyle(color: tierColor(context, idea.words[i].tier))),
+              ],
+            ]),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.3),
+          ),
         const SizedBox(height: 6),
-        Text(idea.text, maxLines: clamp ? 2 : null, overflow: clamp ? TextOverflow.ellipsis : null, style: TextStyle(color: clamp ? p.muted : p.ink, fontSize: clamp ? 14 : 15, height: 1.5)),
+
+        Text(
+          idea.content,
+          maxLines: clamp ? 2 : null,
+          overflow: clamp ? TextOverflow.ellipsis : null,
+          style: TextStyle(color: clamp ? p.muted : p.ink, fontSize: clamp ? 14 : 15, height: 1.5),
+        ),
+
+        if (!clamp && (onGuide != null || onShare != null || onPost != null)) ...[
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              if (onGuide != null)
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.auto_stories, size: 16),
+                  label: Text('${idea.guideLabel} 보기'),
+                  onPressed: onGuide,
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: p.accent,
+                    side: BorderSide(color: p.accent),
+                  ),
+                ),
+              if (onShare != null)
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.link, size: 16),
+                  label: const Text('링크 복사'),
+                  onPressed: onShare,
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: p.ink,
+                    side: BorderSide(color: p.line),
+                  ),
+                ),
+              if (onPost != null)
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.share, size: 16),
+                  label: const Text('피드에 올리기'),
+                  onPressed: onPost,
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: p.ink,
+                    side: BorderSide(color: p.line),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ]),
     );
   }
@@ -359,11 +561,10 @@ class IdeaCard extends StatelessWidget {
 /* ───────────── 홈 화면 ───────────── */
 
 class _Pending {
-  final List<W> before;
-  final Idea? idea;
+  final List<WordItem> before;
+  final IdeaItem? idea;
   final bool saved;
-  final int tIdx;
-  _Pending(this.before, this.idea, this.saved, this.tIdx);
+  _Pending(this.before, this.idea, this.saved);
 }
 
 class HomePage extends StatefulWidget {
@@ -373,18 +574,26 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final ApiService _api = ApiService();
+  final StorageService _storage = StorageService();
   final _ctrl = TextEditingController();
+  final _dirCtrl = TextEditingController();
   final _focus = FocusNode();
   final _rnd = Random();
-  String? cat;
+
+  List<CategoryItem> serverCategories = [];
+  CategoryItem? selectedCategory;
+
   int count = 3;
-  List<W> words = [];
+  List<WordItem> words = [];
   List<String> flicker = [];
-  Idea? idea;
-  int tIdx = -1;
+  IdeaItem? idea;
+  GuideItem? guide;
+
+  bool loadingCategories = false;
   bool loading = false, busy = false, saved = false;
   _Pending? pending;
-  Timer? _rollTimer, _genTimer;
+  Timer? _rollTimer;
   final List<Timer> _timers = [];
 
   bool get frozen => loading || busy || pending != null;
@@ -393,146 +602,451 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _focus.addListener(() => setState(() {}));
+    _fetchCategories();
   }
 
   @override
   void dispose() {
     _stopRoll();
-    _genTimer?.cancel();
     _ctrl.dispose();
+    _dirCtrl.dispose();
     _focus.dispose();
     super.dispose();
   }
 
-  Idea _build() {
-    final it = makeIdea(words.map((w) => WT(w.word, w.tier)).toList(), prev: tIdx, rnd: _rnd);
-    tIdx = it.tIdx;
-    saved = false;
-    return it;
+  Future<void> _fetchCategories() async {
+    setState(() => loadingCategories = true);
+    try {
+      if (_api.isLoggedIn) {
+        final list = await _api.getCategories();
+        if (mounted) {
+          setState(() {
+            serverCategories = list;
+            loadingCategories = false;
+          });
+          return;
+        }
+      }
+    } catch (_) {}
+
+    // Fallback: 오프라인 기본 카테고리
+    if (mounted) {
+      setState(() {
+        serverCategories = kFallbackCats
+            .map((c) => CategoryItem(
+                  id: 'fallback_$c',
+                  name: c,
+                  wordCount: kFallbackData[c]?.length ?? 10,
+                  guideType: c == '음식' ? 'food' : 'general',
+                  guideLabel: c == '음식' ? '만드는 법' : '실행 계획',
+                ))
+            .toList();
+        loadingCategories = false;
+      });
+    }
   }
 
   void _stopRoll() {
     _rollTimer?.cancel();
     _rollTimer = null;
-    for (final t in _timers) { t.cancel(); }
+    for (final t in _timers) {
+      t.cancel();
+    }
     _timers.clear();
   }
 
-  void _snack(String m) => ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(SnackBar(content: Text(m), duration: const Duration(milliseconds: 1600)));
-
-  List<W> _draw(String c, List<W> cur) {
-    final used = <String>{for (final w in cur) if (w.locked) w.word};
-    return List.generate(count, (i) {
-      if (i < cur.length && cur[i].locked) return cur[i];
-      final pool = kData[c]!.where((x) => !used.contains(x) && (i >= cur.length || x != cur[i].word)).toList();
-      final w = pool[_rnd.nextInt(pool.length)];
-      used.add(w);
-      return W(w, randTier(_rnd));
-    });
+  void _snack(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(m), duration: const Duration(milliseconds: 1800)));
   }
 
-  /// 잠재 연출: 고정되지 않은 줄이 섞이다가 위에서부터 하나씩 확정된다.
-  void _roll(List<int> idx) {
-    _stopRoll();
-    if (idx.isEmpty) return;
-    final pool = kData[cat]!;
+  // 1. 단어 뽑기 (온라인 백엔드 draw 또는 오프라인 fallback)
+  Future<void> _drawWords() async {
+    if (selectedCategory == null || frozen) return;
+    final cat = selectedCategory!;
+    final direction = _dirCtrl.text.trim();
+
     setState(() {
       busy = true;
-      flicker = List.filled(words.length, '');
-      for (var i = 0; i < words.length; i++) { words[i].rolling = idx.contains(i); }
+      idea = null;
+      guide = null;
+      pending = null;
+      saved = false;
     });
+
+    try {
+      if (_api.isLoggedIn && !cat.id.startsWith('fallback_')) {
+        final result = await _api.drawWords(
+          categoryId: cat.id,
+          direction: direction,
+        );
+        if (mounted) {
+          setState(() {
+            words = result;
+            busy = false;
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      _snack('서버 단어 뽑기 실패, 오프라인으로 대체합니다: $e');
+    }
+
+    // Fallback 로컬 뽑기
+    final pool = kFallbackData[cat.name] ?? ['단어1', '단어2', '단어3', '단어4', '단어5'];
+    final picked = <String>[];
+    while (picked.length < count && picked.length < pool.length) {
+      final w = pool[_rnd.nextInt(pool.length)];
+      if (!picked.contains(w)) picked.add(w);
+    }
+    setState(() {
+      words = picked.map((t) => WordItem(id: 'local_${_rnd.nextInt(9999)}', text: t, tier: randTier(_rnd))).toList();
+      busy = false;
+    });
+  }
+
+  // 2. 다시 뽑기 (리롤 & 롤링 애니메이션)
+  Future<void> _reroll() async {
+    if (selectedCategory == null || frozen) return;
+    final cat = selectedCategory!;
+    final freeIdx = [for (var i = 0; i < words.length; i++) if (!words[i].locked) i];
+    if (freeIdx.isEmpty) return;
+
+    final prevWords = words.map((w) => w.copy()).toList();
+    final lockedIds = words.where((w) => w.locked).map((w) => w.id).where((id) => id.isNotEmpty).toList();
+    final previousIds = words.map((w) => w.id).where((id) => id.isNotEmpty).toList();
+    final direction = _dirCtrl.text.trim();
+
+    // 롤링 애니메이션 시작
+    _stopRoll();
+    setState(() {
+      busy = true;
+      pending ??= _Pending(prevWords, idea, saved);
+      idea = null;
+      guide = null;
+      saved = false;
+      flicker = List.filled(words.length, '');
+      for (var i = 0; i < words.length; i++) {
+        words[i].rolling = freeIdx.contains(i);
+      }
+    });
+
+    final pool = kFallbackData[cat.name] ?? ['별', '빛', '바람', '구름', '꿈'];
     _rollTimer = Timer.periodic(const Duration(milliseconds: 70), (_) {
       if (!mounted) return;
-      setState(() { for (final i in idx) { if (words[i].rolling) flicker[i] = pool[_rnd.nextInt(pool.length)]; } });
+      setState(() {
+        for (final i in freeIdx) {
+          if (words[i].rolling) flicker[i] = pool[_rnd.nextInt(pool.length)];
+        }
+      });
     });
-    final step = min(450, 1350 ~/ max(1, idx.length - 1));
-    for (var k = 0; k < idx.length; k++) {
-      final i = idx[k];
-      _timers.add(Timer(Duration(milliseconds: 800 + k * step), () { if (mounted) setState(() => words[i].rolling = false); }));
+
+    List<WordItem>? newWords;
+    try {
+      if (_api.isLoggedIn && !cat.id.startsWith('fallback_')) {
+        newWords = await _api.drawWords(
+          categoryId: cat.id,
+          lockedWordIds: lockedIds,
+          previousWordIds: previousIds,
+          direction: direction,
+        );
+      }
+    } catch (_) {}
+
+    // Fallback if not server
+    if (newWords == null || newWords.isEmpty) {
+      final used = <String>{for (final w in words) if (w.locked) w.text};
+      newWords = List.generate(words.length, (i) {
+        if (words[i].locked) return words[i].copy();
+        final avail = pool.where((x) => !used.contains(x)).toList();
+        final w = avail.isNotEmpty ? avail[_rnd.nextInt(avail.length)] : pool[_rnd.nextInt(pool.length)];
+        used.add(w);
+        return WordItem(id: 'local_${_rnd.nextInt(9999)}', text: w, tier: randTier(_rnd));
+      });
     }
-    _timers.add(Timer(Duration(milliseconds: 800 + (idx.length - 1) * step + 700), () {
+
+    // 애니메이션 멈추고 새 단어 적용
+    final step = min(450, 1350 ~/ max(1, freeIdx.length - 1));
+    for (var k = 0; k < freeIdx.length; k++) {
+      final i = freeIdx[k];
+      _timers.add(Timer(Duration(milliseconds: 700 + k * step), () {
+        if (mounted) setState(() => words[i].rolling = false);
+      }));
+    }
+    _timers.add(Timer(Duration(milliseconds: 700 + (freeIdx.length - 1) * step + 500), () {
       if (!mounted) return;
       _stopRoll();
-      setState(() { busy = false; for (final w in words) { w.rolling = false; } });
+      setState(() {
+        busy = false;
+        words = newWords!;
+      });
     }));
-  }
-
-  void _selectCat(String c) {
-    _stopRoll();
-    setState(() {
-      cat = c; idea = null; pending = null; saved = false; tIdx = -1;
-      words = [];
-      _ctrl.text = c;
-    });
-    _focus.unfocus();
-  }
-
-  void _onQuery(String v) {
-    // 글자를 고치면 선택이 풀린다. 목록에 없는 값은 쓸 수 없다.
-    setState(() { if (cat != null && v != cat) { _stopRoll(); cat = null; words = []; idea = null; pending = null; busy = false; saved = false; } });
-  }
-
-  void _setCount(int n) {
-    if (n == count || frozen) return;
-    _stopRoll();
-    setState(() {
-      count = n;
-      words = [];
-      idea = null;
-      pending = null;
-      saved = false;
-      tIdx = -1;
-    });
-  }
-
-  void _drawWords() {
-    if (cat == null || frozen) return;
-    setState(() {
-      words = _draw(cat!, []);
-      idea = null;
-      pending = null;
-      saved = false;
-      tIdx = -1;
-    });
-  }
-
-  void _reroll() {
-    final idx = [for (var i = 0; i < words.length; i++) if (!words[i].locked) i];
-    if (idx.isEmpty) return;
-    setState(() {
-      pending ??= _Pending(words.map((w) => w.copy()).toList(), idea, saved, tIdx);
-      words = _draw(cat!, words);
-      idea = null; saved = false;
-    });
-    _roll(idx);
   }
 
   void _keepPrev() {
     final p = pending!;
-    setState(() { words = p.before.map((w) => w.copy()).toList(); idea = p.idea; saved = p.saved; tIdx = p.tIdx; pending = null; });
+    setState(() {
+      words = p.before.map((w) => w.copy()).toList();
+      idea = p.idea;
+      saved = p.saved;
+      pending = null;
+    });
     _snack('이전 결과를 유지했어요.');
   }
 
-  void _takeNext() { setState(() => pending = null); _snack('이후 결과를 선택했어요.'); }
+  void _takeNext() {
+    setState(() => pending = null);
+    _snack('이후 결과를 선택했어요.');
+  }
 
-  void _generate() {
-    if (frozen || words.isEmpty) return; // 로딩/뽑는 중/선택 대기 중 재요청 차단
+  // 3. 아이디어 생성 (스프링부트 POST /app/ideas 호출)
+  Future<void> _generate() async {
+    if (frozen || words.isEmpty || selectedCategory == null) return;
+    final cat = selectedCategory!;
+    final direction = _dirCtrl.text.trim();
+
     setState(() => loading = true);
-    _genTimer?.cancel();
-    _genTimer = Timer(const Duration(milliseconds: 1100), () {
-      if (!mounted) return;
-      setState(() { loading = false; idea = _build(); });
+
+    try {
+      if (_api.isLoggedIn && !cat.id.startsWith('fallback_')) {
+        // 단어 ID 3개
+        final wordIds = words.map((w) => w.id).where((id) => id.isNotEmpty).toList();
+        if (wordIds.length >= 3) {
+          final resIdea = await _api.createIdea(
+            categoryId: cat.id,
+            categoryName: cat.name,
+            wordIds: wordIds.take(3).toList(),
+            direction: direction,
+          );
+          if (mounted) {
+            setState(() {
+              loading = false;
+              idea = resIdea;
+              guide = null;
+              saved = _storage.isSaved(resIdea.id);
+            });
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      _snack('서버 생성 오류: $e (로컬 생성으로 대체합니다)');
+    }
+
+    // Fallback 로컬 생성
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
+    final fallbackIdea = makeOfflineIdea(words, cat.name, rnd: _rnd);
+    setState(() {
+      loading = false;
+      idea = fallbackIdea;
+      guide = null;
+      saved = false;
     });
   }
 
-  void _save() {
-    if (idea == null || saved || loading || busy) return;
-    store.add(cat!, idea!);
+  // 4. 다시 만들기 (recombine)
+  Future<void> _recombine() async {
+    if (idea == null || loading || busy) return;
+    if (_api.isLoggedIn && !idea!.id.startsWith('local_')) {
+      setState(() => loading = true);
+      try {
+        final recombined = await _api.recombineIdea(
+          ideaId: idea!.id,
+          categoryName: idea!.categoryName,
+        );
+        if (mounted) {
+          setState(() {
+            loading = false;
+            idea = recombined;
+            guide = null;
+            saved = false;
+          });
+          return;
+        }
+      } catch (e) {
+        _snack('재조합 실패: $e');
+      }
+    }
+    _generate();
+  }
+
+  // 5. 후속 가이드 보기
+  Future<void> _showGuide() async {
+    if (idea == null) return;
+    if (guide != null) {
+      GuideDialog.show(context, guide!);
+      return;
+    }
+
+    if (_api.isLoggedIn && !idea!.id.startsWith('local_')) {
+      setState(() => loading = true);
+      try {
+        final g = await _api.getGuide(idea!.id);
+        if (mounted) {
+          setState(() {
+            guide = g;
+            loading = false;
+          });
+          GuideDialog.show(context, g);
+          return;
+        }
+      } catch (e) {
+        _snack('가이드 생성 실패: $e');
+        setState(() => loading = false);
+        return;
+      }
+    }
+
+    // Fallback 모의 가이드
+    final dummy = GuideItem(
+      ideaId: idea!.id,
+      kind: idea!.guideType,
+      label: idea!.guideLabel,
+      requirementsLabel: idea!.guideType == 'food' ? '필요한 재료' : '준비사항',
+      feasible: true,
+      summary: '${idea!.title}를 구현하기 위한 권장 진행 계획입니다.',
+      requirements: [
+        const GuideRequirement(name: '핵심 준비', detail: '기본 기획서 및 사용자 인터뷰 준비'),
+        const GuideRequirement(name: '기술 스택', detail: 'Flutter 프론트엔드 + Spring Boot 백엔드'),
+      ],
+      steps: [
+        const GuideStep(order: 1, title: '기획 구체화', description: '핵심 키워드를 중심으로 MVP 기능 정의'),
+        const GuideStep(order: 2, title: '프로토타입 개발', description: '화면 흐름과 기본 UI 컴포넌트 구성'),
+        const GuideStep(order: 3, title: '배포 및 피드백', description: '사용자 테스트를 거쳐 기능 개선'),
+      ],
+      source: 'mock',
+    );
+    if (!mounted) return;
+    GuideDialog.show(context, dummy);
+  }
+
+  // 6. 링크 공유
+  Future<void> _shareLink() async {
+    if (idea == null) return;
+    try {
+      if (_api.isLoggedIn && !idea!.id.startsWith('local_')) {
+        final url = await _api.createShareLink(idea!.id);
+        await Clipboard.setData(ClipboardData(text: url));
+        _snack('공유 링크가 클립보드에 복사되었어요: $url');
+        return;
+      }
+    } catch (e) {
+      _snack('링크 생성 실패: $e');
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: '아이디어: ${idea!.title}\n${idea!.content}'));
+    _snack('아이디어 텍스트가 클립보드에 복사되었어요.');
+  }
+
+  // 7. 피드에 올리기
+  Future<void> _postToFeed() async {
+    if (idea == null) return;
+    if (!_api.isLoggedIn || idea!.id.startsWith('local_')) {
+      _snack('피드 게시 기능은 스프링부트 로그인 후 사용 가능합니다.');
+      return;
+    }
+    try {
+      await _api.createPost(idea!.id);
+      _snack('피드에 아이디어가 게시되었습니다! 피드 탭에서 확인하세요.');
+    } catch (e) {
+      _snack('피드 등록 실패: $e');
+    }
+  }
+
+  // 8. 아이디어 저장 (로컬 보관)
+  Future<void> _save() async {
+    if (idea == null || saved) return;
+    await _storage.save(idea!, guide: guide);
     setState(() => saved = true);
     _snack('저장했어요. 아이디어 기록에서 볼 수 있어요.');
   }
 
-  /* ── 위젯 ── */
+  void _selectCat(CategoryItem c) {
+    _stopRoll();
+    setState(() {
+      selectedCategory = c;
+      idea = null;
+      guide = null;
+      pending = null;
+      saved = false;
+      words = [];
+      _ctrl.text = c.name;
+    });
+    _focus.unfocus();
+  }
+
+  void _showAddCategoryDialog() {
+    final nameCtrl = TextEditingController();
+    String guideType = 'general';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('새 카테고리 추가'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: '카테고리 이름',
+                  hintText: '예: 우주 탐사, 반려동물',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text('가이드 유형:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String>(
+                initialValue: guideType,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+                items: const [
+                  DropdownMenuItem(value: 'general', child: Text('일반 (실행 계획)')),
+                  DropdownMenuItem(value: 'food', child: Text('음식 (만드는 법)')),
+                  DropdownMenuItem(value: 'software', child: Text('소프트웨어 (구현 가이드)')),
+                  DropdownMenuItem(value: 'contest', child: Text('공모전 (기획서)')),
+                ],
+                onChanged: (v) {
+                  if (v != null) setDialogState(() => guideType = v);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('취소')),
+            FilledButton(
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                Navigator.pop(ctx);
+                try {
+                  final newCat = await _api.createCategory(name: name, guideType: guideType);
+                  await _fetchCategories();
+                  _selectCat(newCat);
+                  _snack('‘$name’ 카테고리가 추가되었습니다.');
+                } catch (e) {
+                  _snack('카테고리 추가 실패: $e');
+                }
+              },
+              child: const Text('추가'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<CategoryItem> get _sug {
+    final q = _ctrl.text.trim();
+    return q.isEmpty
+        ? serverCategories
+        : serverCategories.where((c) => c.name.contains(q)).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -549,12 +1063,36 @@ class _HomePageState extends State<HomePage> {
               children: [
                 _catRow(p),
                 ..._suggestions(p),
+                const SizedBox(height: 10),
+
+                // 방향성 입력창 (선택)
+                if (selectedCategory != null) ...[
+                  TextField(
+                    controller: _dirCtrl,
+                    maxLength: 200,
+                    enabled: !frozen,
+                    decoration: InputDecoration(
+                      labelText: '방향성 (선택사항, 200자 이내)',
+                      hintText: '예: 간편하고 매콤한 캠핑 요리, 직장인을 위한 앱',
+                      counterText: '',
+                      prefixIcon: const Icon(Icons.compass_calibration_outlined, size: 20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
+                words.isEmpty
+                    ? (selectedCategory == null ? _emptyBox(p) : _drawWordsBox(p))
+                    : _pot(p),
                 const SizedBox(height: 14),
-                words.isEmpty ? (cat == null ? _emptyBox(p) : _drawWordsBox(p)) : _pot(p),
-                const SizedBox(height: 14),
+
                 if (words.isNotEmpty && idea == null) ...[
                   GoldButton(
-                    label: loading ? '만드는 중…' : (pending != null && !busy ? '이전/이후를 먼저 선택해주세요' : '아이디어 만들기'),
+                    label: loading
+                        ? '만드는 중…'
+                        : (pending != null && !busy ? '이전/이후를 먼저 선택해주세요' : '아이디어 만들기'),
                     onPressed: frozen ? null : _generate,
                   ),
                   if (loading)
@@ -567,6 +1105,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   const SizedBox(height: 10),
                 ],
+
                 if (words.isNotEmpty) _ideaSection(p),
               ],
             ),
@@ -582,161 +1121,123 @@ class _HomePageState extends State<HomePage> {
         child: Container(
           height: 48,
           padding: const EdgeInsets.only(left: 12, right: 4),
-          decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: _focus.hasFocus ? p.accent : p.line)),
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _focus.hasFocus ? p.accent : p.line),
+          ),
           child: Row(children: [
             Icon(Icons.search, size: 20, color: p.muted),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
-                controller: _ctrl, focusNode: _focus, enabled: !frozen,
-                onChanged: _onQuery, onTapOutside: (_) {},
-                onSubmitted: (_) { final s = _sug; if (s.isNotEmpty) _selectCat(s.first); },
-                decoration: InputDecoration.collapsed(hintText: '카테고리 검색', hintStyle: TextStyle(color: p.muted)),
+                controller: _ctrl,
+                focusNode: _focus,
+                enabled: !frozen,
+                onChanged: (v) {
+                  setState(() {
+                    if (selectedCategory != null && v != selectedCategory!.name) {
+                      _stopRoll();
+                      selectedCategory = null;
+                      words = [];
+                      idea = null;
+                      guide = null;
+                      pending = null;
+                      busy = false;
+                      saved = false;
+                    }
+                  });
+                },
+                decoration: InputDecoration.collapsed(
+                  hintText: '카테고리 검색 또는 선택',
+                  hintStyle: TextStyle(color: p.muted),
+                ),
                 style: TextStyle(color: p.ink, fontSize: 16),
               ),
             ),
             if (_ctrl.text.isNotEmpty && !frozen)
               IconButton(
-                icon: Icon(Icons.close, size: 18, color: p.muted), tooltip: '카테고리 지우기',
-                onPressed: () { _stopRoll(); _ctrl.clear(); setState(() { cat = null; words = []; idea = null; pending = null; busy = false; saved = false; }); _focus.requestFocus(); },
+                icon: Icon(Icons.close, size: 18, color: p.muted),
+                tooltip: '카테고리 지우기',
+                onPressed: () {
+                  _stopRoll();
+                  _ctrl.clear();
+                  setState(() {
+                    selectedCategory = null;
+                    words = [];
+                    idea = null;
+                    guide = null;
+                    pending = null;
+                    busy = false;
+                    saved = false;
+                  });
+                  _focus.requestFocus();
+                },
               ),
           ]),
         ),
       ),
-      const SizedBox(width: 10),
-      _countBox(p),
+      const SizedBox(width: 8),
+      IconButton.filledTonal(
+        icon: const Icon(Icons.add),
+        tooltip: '새 카테고리 추가',
+        onPressed: frozen ? null : _showAddCategoryDialog,
+      ),
     ]);
   }
 
-  Widget _countBox(Pal p) {
-    return PopupMenuButton<int>(
-      enabled: !frozen,
-      tooltip: '단어 개수 선택',
-      onSelected: _setCount,
-      color: p.card,
-      elevation: 6,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      constraints: const BoxConstraints.tightFor(width: 160),
-      padding: EdgeInsets.zero,
-      itemBuilder: (ctx) => [
-        PopupMenuItem<int>(
-          enabled: false,
-          padding: EdgeInsets.zero,
-          height: 160,
-          child: Container(
-            width: 160,
-            height: 160,
-            padding: const EdgeInsets.all(8),
-            alignment: Alignment.center,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var r = 0; r < 3; r++) ...[
-                  if (r > 0) const SizedBox(height: 6),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var c = 0; c < 3; c++) ...[
-                        if (c > 0) const SizedBox(width: 6),
-                        Builder(builder: (itemCtx) {
-                          final n = r * 3 + c + 1;
-                          final isSel = n == count;
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(10),
-                            onTap: () {
-                              Navigator.pop(ctx, n);
-                              _setCount(n);
-                            },
-                            child: Container(
-                              width: 44,
-                              height: 44,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: isSel ? p.accent : p.rowBg,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: isSel ? p.accent : p.line),
-                              ),
-                              child: Text(
-                                '$n',
-                                style: TextStyle(
-                                  color: isSel ? p.accentInk : p.ink,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                      ],
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ],
-      child: Container(
-        width: 48,
-        height: 48,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: p.card,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: p.line),
-        ),
-        child: Text.rich(
-          TextSpan(text: '$count', children: [
-            TextSpan(text: '개', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: p.muted)),
-          ]),
-          style: TextStyle(color: p.ink, fontWeight: FontWeight.w700, fontSize: 16),
-        ),
-      ),
-    );
-  }
-
-  List<String> get _sug {
-    final q = _ctrl.text.trim();
-    return q.isEmpty ? kCats : kCats.where((c) => c.contains(q)).toList();
-  }
-
   List<Widget> _suggestions(Pal p) {
-    final q = _ctrl.text.trim();
     if (_focus.hasFocus && !frozen) {
       final s = _sug;
       return [
         const SizedBox(height: 6),
         Container(
-          constraints: const BoxConstraints(maxHeight: 216),
+          constraints: const BoxConstraints(maxHeight: 220),
           padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: p.line)),
+          decoration: BoxDecoration(
+            color: p.card,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: p.line),
+          ),
           child: s.isEmpty
-              ? Padding(padding: const EdgeInsets.all(12), child: Text('일치하는 카테고리가 없어요', style: TextStyle(color: p.muted)))
-              : ListView(shrinkWrap: true, children: [
-                  for (final c in s)
-                    ListTile(
-                      dense: true, title: Text(c, style: TextStyle(fontWeight: cat == c ? FontWeight.w700 : FontWeight.w400, color: cat == c ? p.accent : p.ink)),
-                      trailing: cat == c ? Text('선택됨', style: TextStyle(color: p.muted, fontSize: 12)) : null,
+              ? Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text('일치하는 카테고리가 없어요', style: TextStyle(color: p.muted)),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: s.length,
+                  itemBuilder: (ctx, i) {
+                    final c = s[i];
+                    final isSel = selectedCategory?.id == c.id;
+                    return ListTile(
+                      dense: true,
+                      title: Text(
+                        c.name,
+                        style: TextStyle(
+                          fontWeight: isSel ? FontWeight.w700 : FontWeight.w400,
+                          color: isSel ? p.accent : p.ink,
+                        ),
+                      ),
+                      subtitle: c.wordCount > 0 ? Text('${c.wordCount}개 단어', style: TextStyle(fontSize: 11, color: p.muted)) : null,
+                      trailing: isSel ? Text('선택됨', style: TextStyle(color: p.muted, fontSize: 12)) : null,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       onTap: () => _selectCat(c),
-                    ),
-                ]),
+                    );
+                  },
+                ),
         ),
       ];
-    }
-    if (q.isNotEmpty && cat == null) {
-      final none = _sug.isEmpty;
-      return [Padding(padding: const EdgeInsets.fromLTRB(2, 6, 2, 0), child: Text(none ? '‘$q’는 없는 카테고리예요. 목록에 있는 카테고리만 쓸 수 있어요.' : '목록에서 카테고리를 눌러 선택해주세요.', style: TextStyle(color: none ? p.danger : p.muted, fontSize: 13)))];
     }
     return const [];
   }
 
   Widget _emptyBox(Pal p) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: p.line, width: 1.5)),
         child: Column(children: [
           Text('카테고리를 선택해주세요', style: TextStyle(color: p.ink, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text('위 검색창에서 카테고리를 고르고 단어를 뽑아보세요.', style: TextStyle(color: p.muted), textAlign: TextAlign.center),
         ]),
       );
@@ -745,9 +1246,9 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
         decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: p.line, width: 1.5)),
         child: Column(children: [
-          Text('‘$cat’ 카테고리가 선택되었어요', style: TextStyle(color: p.ink, fontWeight: FontWeight.w700, fontSize: 16)),
+          Text('‘${selectedCategory?.name}’ 카테고리가 선택되었어요', style: TextStyle(color: p.ink, fontWeight: FontWeight.w700, fontSize: 16)),
           const SizedBox(height: 4),
-          Text('단어 뽑기 버튼을 누르면 추천 단어 $count개가 생성돼요.', style: TextStyle(color: p.muted, fontSize: 14), textAlign: TextAlign.center),
+          Text('단어 뽑기 버튼을 누르면 추천 단어 3개가 생성돼요.', style: TextStyle(color: p.muted, fontSize: 14), textAlign: TextAlign.center),
           const SizedBox(height: 16),
           SizedBox(
             width: 200,
@@ -773,35 +1274,12 @@ class _HomePageState extends State<HomePage> {
       pill = '${kTierName[best]} ${a > b ? '▲' : a < b ? '▼' : '–'}';
     }
     final pillColor = busy ? p.potMuted : tc;
-    final dense = words.length >= 6;
     final int n = words.length;
     final double dividers = n > 1 ? (n - 1) * 1.0 : 0.0;
-    // m: 확정 상태(첫 뽑기 / 선택 이후)의 단어 한 줄 높이 → 단어 영역 H = n*m (+구분선)
-    final double m = n == 1 ? 56.0 : (dense ? 44.0 : 48.0);
+    final double m = 48.0;
     final double singleBoxH = n > 0 ? n * m + dividers : 0.0;
-
-    // 리롤 상태: 고정 버튼 높이 (다시뽑기의 60% = 28.8px)
     const double btnH = 28.8;
-    // n*m과 고정 버튼 크기(btnH)를 바탕으로 각 상황(n=1~9)에서 여유 공간(spacing)과 비교 단어 타일 크기 정밀 계산:
-    // available = singleBoxH - btnH
-    // 각 n별 최적의 spacing:
-    // n=1: 4.2 (타일 높이 23.0px 확보)
-    // n=2: 8.2 (타일 높이 29.5px)
-    // n=3: 10.2 (타일 높이 35.0px)
-    // n=4: 12.2 (타일 높이 37.75px)
-    // n=5,6: 14.2 (타일 높이 39.4px / 36.83px)
-    // n=7: 15.2 (타일 높이 37.71px)
-    // n=8,9: 16.2 (타일 높이 38.375px / 39.0px)
-    // 따라서 compBoxH + spacing + btnH == singleBoxH 가 100% 일치
-    final double spacing = n <= 1
-        ? 4.2
-        : (n == 2
-            ? 8.2
-            : (n == 3
-                ? 10.2
-                : (n == 4
-                    ? 12.2
-                    : (n <= 6 ? 14.2 : (n == 7 ? 15.2 : 16.2)))));
+    final double spacing = 10.2;
     final double compBoxH = (singleBoxH - btnH - spacing).clamp(0.0, double.infinity);
     final double compRowH = n > 0 ? (compBoxH - dividers) / n : 0.0;
 
@@ -816,12 +1294,11 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. 장소 (space between) 등급
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                cat ?? '',
+                selectedCategory?.name ?? '',
                 style: TextStyle(color: p.ink, fontSize: 18, fontWeight: FontWeight.w700),
               ),
               Container(
@@ -836,9 +1313,8 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 12),
 
-          // 2. 단어 영역: 확정 상태든 리롤 상태든 항상 같은 높이(singleBoxH)를 점유
           if (pend == null)
-            _singleWordsBox(p, boxHeight: singleBoxH, rowHeight: m, dense: dense)
+            _singleWordsBox(p, boxHeight: singleBoxH)
           else
             SizedBox(
               height: singleBoxH,
@@ -854,7 +1330,6 @@ class _HomePageState extends State<HomePage> {
                             p,
                             [for (var i = 0; i < words.length; i++) i < pend.before.length ? pend.before[i] : words[i]],
                             isNew: false,
-                            dense: dense,
                             rowHeight: compRowH,
                           ),
                         ),
@@ -864,7 +1339,6 @@ class _HomePageState extends State<HomePage> {
                             p,
                             words,
                             isNew: true,
-                            dense: dense,
                             rowHeight: compRowH,
                           ),
                         ),
@@ -883,7 +1357,6 @@ class _HomePageState extends State<HomePage> {
             ),
           const SizedBox(height: 10),
 
-          // 4. 다시 뽑기 버튼 (위치 고정)
           GoldButton(
             label: pend != null ? '다시 뽑기' : (words.any((w) => w.locked) ? '다시 뽑기' : '전체 다시 뽑기'),
             icon: Icons.casino_outlined,
@@ -894,7 +1367,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 유지 / 선택 버튼 (각자 최고등급 색상 적용, 뽑기 중 비활성화)
   Widget _selButtons(Pal p, double h, {required Color prevColor, required Color nextColor}) {
     return Row(
       children: [
@@ -905,7 +1377,6 @@ class _HomePageState extends State<HomePage> {
               onPressed: busy || loading ? null : _keepPrev,
               style: OutlinedButton.styleFrom(
                 foregroundColor: busy ? p.muted : prevColor,
-                disabledForegroundColor: p.muted.withValues(alpha: 0.5),
                 side: BorderSide(color: busy ? p.line.withValues(alpha: 0.5) : prevColor, width: 1.3),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 padding: EdgeInsets.zero,
@@ -922,7 +1393,6 @@ class _HomePageState extends State<HomePage> {
               onPressed: busy || loading ? null : _takeNext,
               style: OutlinedButton.styleFrom(
                 foregroundColor: busy ? p.muted : nextColor,
-                disabledForegroundColor: p.muted.withValues(alpha: 0.5),
                 side: BorderSide(color: busy ? p.line.withValues(alpha: 0.5) : nextColor, width: 1.5),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 padding: EdgeInsets.zero,
@@ -935,13 +1405,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 평소 1개의 박스 형태 단어 목록
-  Widget _singleWordsBox(
-    Pal p, {
-    required double boxHeight,
-    required double rowHeight,
-    required bool dense,
-  }) {
+  Widget _singleWordsBox(Pal p, {required double boxHeight}) {
     return Container(
       height: boxHeight,
       decoration: BoxDecoration(
@@ -956,7 +1420,7 @@ class _HomePageState extends State<HomePage> {
             for (var i = 0; i < words.length; i++) ...[
               if (i > 0) Divider(height: 1, thickness: 1, color: p.line),
               Expanded(
-                child: _wordTile(p, words[i], i, dense: dense),
+                child: _wordTile(p, words[i], i),
               ),
             ],
           ],
@@ -965,14 +1429,23 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _wordTile(Pal p, W w, int i, {required bool dense}) {
+  Widget _wordTile(Pal p, WordItem w, int i) {
     final c = w.rolling ? p.rowIdle : tierColor(context, w.tier);
-    final text = w.rolling ? (i < flicker.length && flicker[i].isNotEmpty ? flicker[i] : '…') : w.word;
+    final text = w.rolling ? (i < flicker.length && flicker[i].isNotEmpty ? flicker[i] : '…') : w.text;
     final shadow = !w.rolling && glows(w.tier) ? [Shadow(color: c.withValues(alpha: .65), blurRadius: 10)] : null;
     return Material(
       color: w.locked ? p.rowLocked : Colors.transparent,
       child: InkWell(
-        onTap: frozen ? null : () => setState(() => w.locked = !w.locked),
+        onTap: frozen
+            ? null
+            : () {
+                final lockedCount = words.where((item) => item.locked).length;
+                if (!w.locked && lockedCount >= 2) {
+                  _snack('단어는 최대 2개까지만 고정할 수 있습니다.');
+                  return;
+                }
+                setState(() => w.locked = !w.locked);
+              },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Center(
@@ -982,17 +1455,20 @@ class _HomePageState extends State<HomePage> {
                 Icon(w.locked ? Icons.lock : Icons.diamond, size: 20, color: c),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _vc(Text(
+                  child: Text(
                     text,
-                    style: TextStyle(color: c, fontSize: 17, fontWeight: FontWeight.w700, shadows: shadow, height: 1.2, leadingDistribution: TextLeadingDistribution.even),
+                    style: TextStyle(color: c, fontSize: 17, fontWeight: FontWeight.w700, shadows: shadow),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                  ), 17),
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(border: Border.all(color: c), borderRadius: BorderRadius.circular(99)),
-                  child: _vc(Text(w.rolling ? '???' : kTierName[w.tier]!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, height: 1.2, leadingDistribution: TextLeadingDistribution.even).copyWith(color: c)), 11),
+                  child: Text(
+                    w.rolling ? '???' : kTierName[w.tier]!,
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c),
+                  ),
                 ),
               ],
             ),
@@ -1002,17 +1478,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// 한글 폰트는 ascent/descent가 비대칭이라 글자가 살짝 아래로 처져 보인다 → 글자 크기 비례로 위로 보정해 시각적 중앙 정렬
-  Widget _vc(Widget child, double fontSize) => Transform.translate(offset: Offset(0, -fontSize * 0.07), child: child);
-
-  // 리롤 시 2개의 박스(이전/이후) 중 하나: 결과창과 동일한 행 높이, 위아래 불필요한 패딩 없이 각 행 중앙 정렬
-  Widget _comparisonWordsBox(
-    Pal p,
-    List<W> wordList, {
-    required bool isNew,
-    required bool dense,
-    required double rowHeight,
-  }) {
+  Widget _comparisonWordsBox(Pal p, List<WordItem> wordList, {required bool isNew, required double rowHeight}) {
     final best = bestOf(wordList.map((w) => w.tier));
     final tc = tierColor(context, best);
     final borderColor = (isNew && busy) ? p.potBd : tc;
@@ -1030,7 +1496,7 @@ class _HomePageState extends State<HomePage> {
             for (var i = 0; i < wordList.length; i++) ...[
               if (i > 0) Divider(height: 1, thickness: 1, color: p.line),
               Expanded(
-                child: _compWordTile(p, wordList[i], i, isNew: isNew, dense: dense, rowHeight: rowHeight),
+                child: _compWordTile(p, wordList[i], i, isNew: isNew),
               ),
             ],
           ],
@@ -1039,17 +1505,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _compWordTile(Pal p, W w, int i, {required bool isNew, required bool dense, required double rowHeight}) {
+  Widget _compWordTile(Pal p, WordItem w, int i, {required bool isNew}) {
     final isRolling = isNew && w.rolling;
     final c = isRolling ? p.rowIdle : tierColor(context, w.tier);
-    final text = isRolling ? (i < flicker.length && flicker[i].isNotEmpty ? flicker[i] : '…') : w.word;
+    final text = isRolling ? (i < flicker.length && flicker[i].isNotEmpty ? flicker[i] : '…') : w.text;
     final shadow = !isRolling && glows(w.tier) ? [Shadow(color: c.withValues(alpha: .65), blurRadius: 8)] : null;
-    final double iconSize = rowHeight < 25 ? 12 : (dense ? 13 : 15);
-    final double fontSize = rowHeight < 25 ? 11.5 : (dense ? 12.5 : 13.5);
-    final double badgeFont = rowHeight < 25 ? 7.5 : (dense ? 8.5 : 9.0);
-    final EdgeInsets badgePad = rowHeight < 25
-        ? const EdgeInsets.symmetric(horizontal: 4, vertical: 0.5)
-        : const EdgeInsets.symmetric(horizontal: 5, vertical: 1);
 
     return Container(
       color: w.locked ? p.rowLocked : Colors.transparent,
@@ -1058,24 +1518,24 @@ class _HomePageState extends State<HomePage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(w.locked ? Icons.lock : Icons.diamond, size: iconSize, color: c),
+            Icon(w.locked ? Icons.lock : Icons.diamond, size: 14, color: c),
             const SizedBox(width: 6),
             Expanded(
-              child: _vc(Text(
+              child: Text(
                 text,
-                style: TextStyle(color: c, fontSize: fontSize, fontWeight: FontWeight.w700, shadows: shadow, height: 1.2, leadingDistribution: TextLeadingDistribution.even),
+                style: TextStyle(color: c, fontSize: 13, fontWeight: FontWeight.w700, shadows: shadow),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-              ), fontSize),
+              ),
             ),
             const SizedBox(width: 4),
             Container(
-              padding: badgePad,
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(border: Border.all(color: c, width: 0.8), borderRadius: BorderRadius.circular(99)),
-              child: _vc(Text(
+              child: Text(
                 isRolling ? '???' : kTierName[w.tier]!,
-                style: TextStyle(color: c, fontSize: badgeFont, fontWeight: FontWeight.w600, height: 1.2, leadingDistribution: TextLeadingDistribution.even),
-              ), badgeFont),
+                style: TextStyle(color: c, fontSize: 9, fontWeight: FontWeight.w600),
+              ),
             ),
           ],
         ),
@@ -1085,15 +1545,34 @@ class _HomePageState extends State<HomePage> {
 
   Widget _ideaSection(Pal p) {
     if (idea == null) {
-      final msg = loading ? '단어를 조합하고 있어요…' : busy ? '단어를 뽑는 중이에요' : pending != null ? '이전과 이후 중 하나를 선택하면 아이디어를 만들 수 있어요.' : words.isNotEmpty ? '위 버튼을 누르면 단어로 아이디어를 만들어요.' : '단어를 뽑으면 여기에 아이디어가 나와요.';
+      final msg = loading
+          ? 'AI가 아이디어를 조합하고 있어요…'
+          : busy
+              ? '단어를 뽑는 중이에요'
+              : pending != null
+                  ? '이전과 이후 중 하나를 선택하면 아이디어를 만들 수 있어요.'
+                  : words.isNotEmpty
+                      ? '위 버튼을 누르면 단어로 아이디어를 만들어요.'
+                      : '단어를 뽑으면 여기에 아이디어가 나와요.';
       return Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14), alignment: Alignment.center,
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: p.line, style: BorderStyle.solid)),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: p.line),
+        ),
         child: Text(msg, textAlign: TextAlign.center, style: TextStyle(color: p.muted)),
       );
     }
+
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      IdeaCard(idea: idea!, tag: '만들어진 아이디어 · $cat'),
+      IdeaCard(
+        idea: idea!,
+        tag: '만들어진 아이디어 · ${selectedCategory?.name ?? ""}',
+        onGuide: _showGuide,
+        onShare: _shareLink,
+        onPost: _postToFeed,
+      ),
       const SizedBox(height: 12),
       Row(children: [
         Expanded(
@@ -1101,7 +1580,7 @@ class _HomePageState extends State<HomePage> {
           child: SizedBox(
             height: 48,
             child: OutlinedButton(
-              onPressed: (frozen && !loading) || busy ? null : _generate,
+              onPressed: (frozen && !loading) || busy ? null : _recombine,
               style: OutlinedButton.styleFrom(
                 foregroundColor: p.ink,
                 side: BorderSide(color: p.line),
@@ -1112,7 +1591,36 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         const SizedBox(width: 10),
-        Expanded(flex: 14, child: SizedBox(height: 48, child: _SaveBtn(saved: saved, onTap: _save))),
+        Expanded(
+          flex: 14,
+          child: SizedBox(
+            height: 48,
+            child: Material(
+              color: Colors.transparent,
+              child: Ink(
+                decoration: BoxDecoration(
+                  gradient: saved ? null : kGold,
+                  color: saved ? p.accentSoft : null,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: saved ? null : _save,
+                  child: Center(
+                    child: Text(
+                      saved ? '저장됨' : '아이디어 저장',
+                      style: TextStyle(
+                        color: saved ? p.accent : kGoldInk,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ]),
       if (loading)
         Padding(
@@ -1126,31 +1634,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _SaveBtn extends StatelessWidget {
-  final bool saved;
-  final VoidCallback onTap;
-  const _SaveBtn({required this.saved, required this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    final p = Pal.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: Ink(
-        decoration: BoxDecoration(gradient: saved ? null : kGold, color: saved ? p.accentSoft : null, borderRadius: BorderRadius.circular(12)),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12), onTap: saved ? null : onTap,
-          child: Center(child: Text(saved ? '저장됨' : '아이디어 저장', style: TextStyle(color: saved ? p.accent : kGoldInk, fontWeight: FontWeight.w700, fontSize: 15))),
-        ),
-      ),
-    );
-  }
-}
-
 /* ───────────── 아이디어 기록 화면 ───────────── */
-
-const bool kSimulateLogError = false; // true로 바꾸면 오류 상태를 볼 수 있다 (백엔드 연결 시 실제 오류로 대체)
-
-enum LogStatus { loading, ready, error }
 
 class LogPage extends StatefulWidget {
   const LogPage({super.key});
@@ -1159,21 +1643,8 @@ class LogPage extends StatefulWidget {
 }
 
 class _LogPageState extends State<LogPage> {
-  LogStatus status = LogStatus.loading;
+  final StorageService _storage = StorageService();
   bool edit = false;
-  Timer? _t;
-
-  @override
-  void initState() { super.initState(); _load(); }
-
-  @override
-  void dispose() { _t?.cancel(); super.dispose(); }
-
-  void _load() {
-    setState(() => status = LogStatus.loading);
-    _t?.cancel();
-    _t = Timer(const Duration(milliseconds: 700), () { if (mounted) setState(() => status = kSimulateLogError ? LogStatus.error : LogStatus.ready); });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1185,7 +1656,10 @@ class _LogPageState extends State<LogPage> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
-            child: ListenableBuilder(listenable: store, builder: (context, _) => _content(p)),
+            child: ListenableBuilder(
+              listenable: _storage,
+              builder: (context, _) => _content(p),
+            ),
           ),
         ),
       ),
@@ -1193,24 +1667,7 @@ class _LogPageState extends State<LogPage> {
   }
 
   Widget _content(Pal p) {
-    if (status == LogStatus.loading) {
-      return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        for (var i = 0; i < 4; i++) Container(height: 116, margin: const EdgeInsets.only(bottom: 10), decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(18), border: Border.all(color: p.line))),
-      ]);
-    }
-    if (status == LogStatus.error) {
-      return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(color: p.dangerSoft, borderRadius: BorderRadius.circular(14)),
-          child: Row(children: [
-            Expanded(child: Text('기록을 불러오지 못했어요.', style: TextStyle(color: p.danger))),
-            OutlinedButton(onPressed: _load, style: OutlinedButton.styleFrom(foregroundColor: p.danger, side: BorderSide(color: p.danger)), child: const Text('다시 시도')),
-          ]),
-        ),
-      ]);
-    }
-    final items = store.saved;
+    final items = _storage.records;
     if (items.isEmpty) {
       return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Container(
@@ -1219,32 +1676,58 @@ class _LogPageState extends State<LogPage> {
           child: Column(children: [
             Text('아이디어를 생성해보세요', style: TextStyle(color: p.ink, fontWeight: FontWeight.w600)),
             const SizedBox(height: 2),
-            Text('홈에서 단어를 뽑고 저장하면 여기에 쌓여요.', style: TextStyle(color: p.muted)),
+            Text('홈에서 단어를 뽑고 저장하면 여기에 영구 보관돼요.', style: TextStyle(color: p.muted)),
             const SizedBox(height: 14),
-            SizedBox(width: 220, child: GoldButton(label: '아이디어 만들러 가기', onPressed: () => Navigator.maybePop(context))),
+            SizedBox(
+              width: 220,
+              child: GoldButton(
+                label: '아이디어 만들러 가기',
+                onPressed: () => Navigator.maybePop(context),
+              ),
+            ),
           ]),
         ),
       ]);
     }
+
     return ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Text('저장한 아이디어 ${items.length}개', style: TextStyle(color: p.muted, fontSize: 14)),
-        TextButton(onPressed: () => setState(() => edit = !edit), child: Text(edit ? '완료' : '편집', style: TextStyle(color: p.accent, fontWeight: FontWeight.w600))),
+        TextButton(
+          onPressed: () => setState(() => edit = !edit),
+          child: Text(edit ? '완료' : '편집', style: TextStyle(color: p.accent, fontWeight: FontWeight.w600)),
+        ),
       ]),
       for (final s in items)
         Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.only(bottom: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            IdeaCard(idea: s.idea, tag: '${s.cat} · ${whenLabel(s.at)}', clamp: true),
+            IdeaCard(
+              idea: s.idea,
+              tag: '${s.categoryName} · ${whenLabel(s.at)}',
+              clamp: !edit,
+              onGuide: s.guide != null ? () => GuideDialog.show(context, s.guide!) : null,
+              onShare: () async {
+                await Clipboard.setData(ClipboardData(text: '아이디어: ${s.idea.title}\n${s.idea.content}'));
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('아이디어가 복사되었어요.')));
+                }
+              },
+            ),
             if (edit)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: OutlinedButton(
                   onPressed: () {
-                    store.remove(s.id);
-                    if (store.saved.isEmpty) setState(() => edit = false);
+                    _storage.remove(s.id);
+                    if (_storage.records.isEmpty) setState(() => edit = false);
                   },
-                  style: OutlinedButton.styleFrom(foregroundColor: p.danger, side: BorderSide(color: p.danger), minimumSize: const Size.fromHeight(40), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: p.danger,
+                    side: BorderSide(color: p.danger),
+                    minimumSize: const Size.fromHeight(40),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                   child: const Text('삭제'),
                 ),
               ),

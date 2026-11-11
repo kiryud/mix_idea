@@ -1,0 +1,56 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-users-table-v1
+      author: 김동현
+      comment: users 테이블 생성
+      preConditions:
+        onFail: MARK_RAN
+        onError: CONTINUE
+        not:
+          tableExists:
+            tableName: users
+      changes:
+        - tagDatabase:
+            tag: create-users-table-20240619
+        - createTable:
+            tableName: users
+            columns:
+              - column:
+                  name: idx
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: uid
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: id
+                  type: VARCHAR(255)
+                  constraints:
+                    unique: true
+              - column:
+                  name: pw
+                  type: VARCHAR(255)
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+              - column:
+                  name: role
+                  type: ENUM('ADMIN', 'USER')
+                  constraints:
+                    nullable: false
+                  defaultValue: "USER"
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP

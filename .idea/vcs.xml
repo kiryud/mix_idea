@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../flutter/flutter" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/backend/server/springboot_kt" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/idea-support-server" vcs="Git" />
+  </component>
+</project>

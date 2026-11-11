@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - includeAll:
+      path: classpath:db/v1/table
+  - include:
+      file: db/v2/001-domain.sql
+  - include:
+      file: db/v2/002-seed.sql
+  - include:
+      file: db/v3/001-category-guides.sql

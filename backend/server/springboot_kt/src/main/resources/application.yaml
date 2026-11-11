@@ -1,0 +1,50 @@
+spring:
+  config:
+    import: "optional:file:./src/main/resources/.env[.properties]"
+  application:
+    name: idea-support-server
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog-master.yml
+jwt:
+  secret: ${JWT_SECRET}
+  access_token_expiration_time: 600
+  refresh_token_expiration_time: 604800
+sha:
+  key: ${SHA_KEY}
+aes:
+  key: ${AES_KEY}
+logging:
+  slack:
+    webhook:
+      url: ${LOGGING_SLACK_WEBHOOK_URL:}
+swagger:
+  url: ${SERVER_PUBLIC_URL:http://localhost:8080}
+  description: Idea Support Server
+app:
+  public-url: ${SERVER_PUBLIC_URL:http://localhost:8080}
+  cors:
+    origins: ${CORS_ORIGINS:http://localhost:8081,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000}
+  ai:
+    mode: ${AI_MODE:mock}
+    key: ${GEMINI_API_KEY:}
+    model: ${AI_MODEL:}
+    idea-timeout-seconds: ${AI_IDEA_TIMEOUT_SECONDS:5}
+    recipe-timeout-seconds: ${AI_RECIPE_TIMEOUT_SECONDS:20}
+    match-timeout-seconds: ${AI_MATCH_TIMEOUT_SECONDS:15}
+    max-concurrent: ${AI_MAX_CONCURRENT:4}
+  limits:
+    generation: 10
+    recipe: 5
+    preview: 20
+    category: 10
+springdoc:
+  swagger-ui:
+    urls-primary-name: app
+    display-operation-id: true
+    persist-authorization: true
