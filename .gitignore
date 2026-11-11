@@ -1,0 +1,12 @@
+# IDE & Editor files
+.idea/
+*.iml
+.vscode/
+
+# Local standalone server copy (not tracked)
+idea-support-server/
+
+# OS files
+.DS_Store
+Thumbs.db
+.env
