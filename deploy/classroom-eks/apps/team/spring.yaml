@@ -23,7 +23,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: spring
-          image: 950177940921.dkr.ecr.ap-southeast-2.amazonaws.com/idea-support-server:latest
+          image: 950177940921.dkr.ecr.ap-southeast-2.amazonaws.com/idea-support-server4:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
