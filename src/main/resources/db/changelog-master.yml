@@ -7,3 +7,7 @@ databaseChangeLog:
       file: db/v2/002-seed.sql
   - include:
       file: db/v3/001-category-guides.sql
+  - include:
+      file: db/v4/001-animal-category.sql
+  - include:
+      file: db/v4/002-more-categories.sql

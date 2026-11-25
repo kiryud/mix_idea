@@ -579,6 +579,7 @@ class _HomePageState extends State<HomePage> {
   final _ctrl = TextEditingController();
   final _dirCtrl = TextEditingController();
   final _focus = FocusNode();
+  final _catScroll = ScrollController();
   final _rnd = Random();
 
   List<CategoryItem> serverCategories = [];
@@ -611,6 +612,7 @@ class _HomePageState extends State<HomePage> {
     _ctrl.dispose();
     _dirCtrl.dispose();
     _focus.dispose();
+    _catScroll.dispose();
     super.dispose();
   }
 
@@ -1322,31 +1324,36 @@ class _HomePageState extends State<HomePage> {
                   padding: const EdgeInsets.all(12),
                   child: Text('일치하는 카테고리가 없어요', style: TextStyle(color: p.muted)),
                 )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: s.length,
-                  itemBuilder: (ctx, i) {
-                    final c = s[i];
-                    final isSel = selectedCategory?.id == c.id;
-                    return Listener(
-                      // 마우스 누르는 즉시 포커스 해제 전에 선택 이벤트 실행
-                      onPointerDown: (_) => _selectCat(c),
-                      child: ListTile(
-                        dense: true,
-                        title: Text(
-                          c.name,
-                          style: TextStyle(
-                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w400,
-                            color: isSel ? p.accent : p.ink,
+              : Scrollbar(
+                  controller: _catScroll,
+                  thumbVisibility: true, // 스크롤바를 항상 표시
+                  child: ListView.builder(
+                    controller: _catScroll,
+                    shrinkWrap: true,
+                    itemCount: s.length,
+                    itemBuilder: (ctx, i) {
+                      final c = s[i];
+                      final isSel = selectedCategory?.id == c.id;
+                      return Listener(
+                        // 마우스 누르는 즉시 포커스 해제 전에 선택 이벤트 실행
+                        onPointerDown: (_) => _selectCat(c),
+                        child: ListTile(
+                          dense: true,
+                          title: Text(
+                            c.name,
+                            style: TextStyle(
+                              fontWeight: isSel ? FontWeight.w700 : FontWeight.w400,
+                              color: isSel ? p.accent : p.ink,
+                            ),
                           ),
+                          subtitle: c.wordCount > 0 ? Text('${c.wordCount}개 단어', style: TextStyle(fontSize: 11, color: p.muted)) : null,
+                          trailing: isSel ? Text('선택됨', style: TextStyle(color: p.muted, fontSize: 12)) : null,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          onTap: () => _selectCat(c),
                         ),
-                        subtitle: c.wordCount > 0 ? Text('${c.wordCount}개 단어', style: TextStyle(fontSize: 11, color: p.muted)) : null,
-                        trailing: isSel ? Text('선택됨', style: TextStyle(color: p.muted, fontSize: 12)) : null,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        onTap: () => _selectCat(c),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
         ),
       ];
