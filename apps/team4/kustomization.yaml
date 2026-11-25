@@ -5,6 +5,6 @@ resources:
   - mysql.yaml
   - spring.yaml
 images:
-  - name: 950177940921.dkr.ecr.ap-southeast-2.amazonaws.com/idea-support-server
+  - name: 950177940921.dkr.ecr.ap-southeast-2.amazonaws.com/idea-support-server4
     digest: sha256:14075b3a5eccd5aa0f9517ae70208fc4b0a6df45d1a6d148f48cbd660f567de2
     newTag: latest
