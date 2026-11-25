@@ -225,6 +225,10 @@ jib {
 			providers.gradleProperty("containerImage")
 				.orElse(providers.environmentVariable("CONTAINER_IMAGE"))
 				.getOrElse("local/idea-support-server")
+		auth {
+			username = providers.environmentVariable("REGISTRY_USER").getOrElse("")
+			password = providers.environmentVariable("REGISTRY_PASSWORD").getOrElse("")
+		}
 	}
 	container {
 		jvmFlags =
