@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spring
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 300
+  minReadySeconds: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: spring
+  template:
+    metadata:
+      labels:
+        app: spring
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: spring
+          image: 950177940921.dkr.ecr.ap-southeast-2.amazonaws.com/idea-support-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+            - name: DB_HOST
+              value: jdbc:mysql://mysql.team.svc.cluster.local:3306/idea_support?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-auth
+                  key: MYSQL_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-auth
+                  key: MYSQL_PASSWORD
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=70.0 -Dfile.encoding=UTF-8
+            - name: AI_MODE
+              value: mock
+          envFrom:
+            - secretRef:
+                name: spring-auth
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          startupProbe:
+            httpGet:
+              path: /common/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /common/health
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spring
+spec:
+  type: ClusterIP
+  selector:
+    app: spring
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
