@@ -1116,74 +1116,192 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _catRow(Pal p) {
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Expanded(
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.only(left: 12, right: 4),
-          decoration: BoxDecoration(
-            color: p.card,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _focus.hasFocus ? p.accent : p.line),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 상단 가로 스크롤 빠른 카테고리 칩 목록
+        if (serverCategories.isNotEmpty) ...[
+          SizedBox(
+            height: 38,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: serverCategories.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (ctx, i) {
+                final c = serverCategories[i];
+                final isSel = selectedCategory?.id == c.id;
+                return ChoiceChip(
+                  label: Text(c.name),
+                  selected: isSel,
+                  showCheckmark: false,
+                  labelStyle: TextStyle(
+                    color: isSel ? p.accentInk : p.ink,
+                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 13,
+                  ),
+                  selectedColor: p.accent,
+                  backgroundColor: p.card,
+                  side: BorderSide(color: isSel ? p.accent : p.line),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  onSelected: frozen
+                      ? null
+                      : (v) {
+                          if (v) _selectCat(c);
+                        },
+                );
+              },
+            ),
           ),
-          child: Row(children: [
-            Icon(Icons.search, size: 20, color: p.muted),
-            const SizedBox(width: 8),
+          const SizedBox(height: 10),
+        ],
+
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Expanded(
-              child: TextField(
-                controller: _ctrl,
-                focusNode: _focus,
-                enabled: !frozen,
-                onChanged: (v) {
-                  setState(() {
-                    if (selectedCategory != null && v != selectedCategory!.name) {
-                      _stopRoll();
-                      selectedCategory = null;
-                      words = [];
-                      idea = null;
-                      guide = null;
-                      pending = null;
-                      busy = false;
-                      saved = false;
-                    }
-                  });
-                },
-                decoration: InputDecoration.collapsed(
-                  hintText: '카테고리 검색 또는 선택',
-                  hintStyle: TextStyle(color: p.muted),
+              child: Container(
+                height: 48,
+                padding: const EdgeInsets.only(left: 12, right: 4),
+                decoration: BoxDecoration(
+                  color: p.card,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _focus.hasFocus ? p.accent : p.line),
                 ),
-                style: TextStyle(color: p.ink, fontSize: 16),
+                child: Row(children: [
+                  Icon(Icons.search, size: 20, color: p.muted),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _ctrl,
+                      focusNode: _focus,
+                      enabled: !frozen,
+                      onChanged: (v) {
+                        setState(() {
+                          if (selectedCategory != null && v != selectedCategory!.name) {
+                            _stopRoll();
+                            selectedCategory = null;
+                            words = [];
+                            idea = null;
+                            guide = null;
+                            pending = null;
+                            busy = false;
+                            saved = false;
+                          }
+                        });
+                      },
+                      onSubmitted: (_) {
+                        final s = _sug;
+                        if (s.isNotEmpty) _selectCat(s.first);
+                      },
+                      decoration: InputDecoration.collapsed(
+                        hintText: '카테고리 검색 또는 선택',
+                        hintStyle: TextStyle(color: p.muted),
+                      ),
+                      style: TextStyle(color: p.ink, fontSize: 16),
+                    ),
+                  ),
+                  if (_ctrl.text.isNotEmpty && !frozen)
+                    IconButton(
+                      icon: Icon(Icons.close, size: 18, color: p.muted),
+                      tooltip: '카테고리 지우기',
+                      onPressed: () {
+                        _stopRoll();
+                        _ctrl.clear();
+                        setState(() {
+                          selectedCategory = null;
+                          words = [];
+                          idea = null;
+                          guide = null;
+                          pending = null;
+                          busy = false;
+                          saved = false;
+                        });
+                        _focus.requestFocus();
+                      },
+                    ),
+                  IconButton(
+                    icon: Icon(Icons.arrow_drop_down, color: p.muted),
+                    tooltip: '전체 카테고리 보기',
+                    onPressed: frozen ? null : () => _showCategoryPickerSheet(p),
+                  ),
+                ]),
               ),
             ),
-            if (_ctrl.text.isNotEmpty && !frozen)
-              IconButton(
-                icon: Icon(Icons.close, size: 18, color: p.muted),
-                tooltip: '카테고리 지우기',
-                onPressed: () {
-                  _stopRoll();
-                  _ctrl.clear();
-                  setState(() {
-                    selectedCategory = null;
-                    words = [];
-                    idea = null;
-                    guide = null;
-                    pending = null;
-                    busy = false;
-                    saved = false;
-                  });
-                  _focus.requestFocus();
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              icon: const Icon(Icons.add),
+              tooltip: '새 카테고리 추가',
+              onPressed: frozen ? null : _showAddCategoryDialog,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showCategoryPickerSheet(Pal p) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.6),
+        decoration: BoxDecoration(
+          color: p.card,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(color: p.line, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('카테고리 선택', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: p.ink)),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: '새 카테고리 추가',
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showAddCategoryDialog();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.separated(
+                itemCount: serverCategories.length,
+                separatorBuilder: (_, _) => Divider(height: 1, color: p.line),
+                itemBuilder: (cCtx, i) {
+                  final cat = serverCategories[i];
+                  final isSel = selectedCategory?.id == cat.id;
+                  return ListTile(
+                    title: Text(cat.name, style: TextStyle(fontWeight: isSel ? FontWeight.bold : FontWeight.normal, color: isSel ? p.accent : p.ink)),
+                    subtitle: cat.wordCount > 0 ? Text('${cat.wordCount}개 단어 · ${cat.guideLabel}', style: TextStyle(fontSize: 12, color: p.muted)) : null,
+                    trailing: isSel ? Icon(Icons.check, color: p.accent) : null,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _selectCat(cat);
+                    },
+                  );
                 },
               ),
-          ]),
+            ),
+          ],
         ),
       ),
-      const SizedBox(width: 8),
-      IconButton.filledTonal(
-        icon: const Icon(Icons.add),
-        tooltip: '새 카테고리 추가',
-        onPressed: frozen ? null : _showAddCategoryDialog,
-      ),
-    ]);
+    );
   }
 
   List<Widget> _suggestions(Pal p) {
@@ -1210,19 +1328,23 @@ class _HomePageState extends State<HomePage> {
                   itemBuilder: (ctx, i) {
                     final c = s[i];
                     final isSel = selectedCategory?.id == c.id;
-                    return ListTile(
-                      dense: true,
-                      title: Text(
-                        c.name,
-                        style: TextStyle(
-                          fontWeight: isSel ? FontWeight.w700 : FontWeight.w400,
-                          color: isSel ? p.accent : p.ink,
+                    return Listener(
+                      // 마우스 누르는 즉시 포커스 해제 전에 선택 이벤트 실행
+                      onPointerDown: (_) => _selectCat(c),
+                      child: ListTile(
+                        dense: true,
+                        title: Text(
+                          c.name,
+                          style: TextStyle(
+                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w400,
+                            color: isSel ? p.accent : p.ink,
+                          ),
                         ),
+                        subtitle: c.wordCount > 0 ? Text('${c.wordCount}개 단어', style: TextStyle(fontSize: 11, color: p.muted)) : null,
+                        trailing: isSel ? Text('선택됨', style: TextStyle(color: p.muted, fontSize: 12)) : null,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        onTap: () => _selectCat(c),
                       ),
-                      subtitle: c.wordCount > 0 ? Text('${c.wordCount}개 단어', style: TextStyle(fontSize: 11, color: p.muted)) : null,
-                      trailing: isSel ? Text('선택됨', style: TextStyle(color: p.muted, fontSize: 12)) : null,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      onTap: () => _selectCat(c),
                     );
                   },
                 ),
