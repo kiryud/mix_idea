@@ -172,6 +172,8 @@ ThemeData _theme(Brightness b) {
   return ThemeData(
     useMaterial3: true,
     brightness: b,
+    // 한글 폰트를 앱에 넣어 두어, 웹에서 폰트가 늦게 도착해 글자가 잘리는 문제를 막는다
+    fontFamily: 'NotoSansKR',
     scaffoldBackgroundColor: p.bg,
     colorScheme: ColorScheme.fromSeed(seedColor: p.accent, brightness: b).copyWith(
       surface: p.card,
@@ -184,7 +186,7 @@ ThemeData _theme(Brightness b) {
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: true,
-      titleTextStyle: TextStyle(color: p.ink, fontSize: 20, fontWeight: FontWeight.w700),
+      titleTextStyle: TextStyle(fontFamily: 'NotoSansKR', color: p.ink, fontSize: 20, fontWeight: FontWeight.w700),
     ),
     drawerTheme: DrawerThemeData(backgroundColor: p.card),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
@@ -583,6 +585,7 @@ class _HomePageState extends State<HomePage> {
   final _rnd = Random();
 
   List<CategoryItem> serverCategories = [];
+  List<CategoryItem> _chipCats = []; // 상단 칩 줄에 보여줄 무작위 카테고리 3개
   CategoryItem? selectedCategory;
 
   int count = 3;
@@ -624,6 +627,7 @@ class _HomePageState extends State<HomePage> {
         if (mounted) {
           setState(() {
             serverCategories = list;
+            _chipCats = _pickChipCats(list);
             loadingCategories = false;
           });
           return;
@@ -643,10 +647,15 @@ class _HomePageState extends State<HomePage> {
                   guideLabel: c == '음식' ? '만드는 법' : '실행 계획',
                 ))
             .toList();
+        _chipCats = _pickChipCats(serverCategories);
         loadingCategories = false;
       });
     }
   }
+
+  // 접속·새로고침할 때마다 카테고리를 섞어서 3개만 고른다
+  List<CategoryItem> _pickChipCats(List<CategoryItem> all) =>
+      (List.of(all)..shuffle(_rnd)).take(3).toList();
 
   void _stopRoll() {
     _rollTimer?.cancel();
@@ -1122,15 +1131,15 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 상단 가로 스크롤 빠른 카테고리 칩 목록
-        if (serverCategories.isNotEmpty) ...[
+        if (_chipCats.isNotEmpty) ...[
           SizedBox(
             height: 38,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: serverCategories.length,
+              itemCount: _chipCats.length,
               separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (ctx, i) {
-                final c = serverCategories[i];
+                final c = _chipCats[i];
                 final isSel = selectedCategory?.id == c.id;
                 return ChoiceChip(
                   label: Text(c.name),
